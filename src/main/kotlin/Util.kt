@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
