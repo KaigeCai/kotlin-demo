@@ -52,7 +52,7 @@ class Game {
     fun start(isLoaded: Boolean = false) {
         if (!isLoaded) {
             println("欢迎来到冒险游戏！请输入你的名字：")
-            player.name = readlnOrNull() ?: "冒险者"
+            player.name = readlnOrNull()?.takeIf { it.isNotBlank() } ?: "冒险者"
         }
         println("你醒来发现自己在${currentLocation.name}。冒险开始了！")
 
@@ -63,11 +63,12 @@ class Game {
             println(currentLocation.description)
             println("可去的方向: ${currentLocation.exits.keys.joinToString(", ")}")
             println("地上有: ${currentLocation.items.joinToString(", ")}")
-            println("输入命令（北、南、东、西、拾取、与村民对话、保存、退出）：")
+            println("输入命令（北、南、东、西、拾取、与村民对话、打开背包、保存、退出）：")
             when (val input = readlnOrNull()?.lowercase(Locale.getDefault())) {
                 "北", "南", "东", "西" -> move(input)
                 "拾取" -> pickUpItem()
                 "与村民对话" -> talkToVillager()
+                "打开背包" -> openInventory()
                 "保存" -> saveGame()
                 "退出" -> {
                     println("感谢游玩！")
@@ -201,6 +202,66 @@ class Game {
             println("没有找到保存的游戏。")
         }
     }
+
+    // 打开背包
+    private fun openInventory() {
+        if (player.inventory.isEmpty()) {
+            println("你的背包是空的！")
+            return
+        }
+
+        println("背包物品:")
+        player.inventory.forEachIndexed { index, item ->
+            println("${index + 1}. $item")
+        }
+        println("输入物品编号选择物品，或输入0返回:")
+
+        when (val choice = readlnOrNull()?.toIntOrNull()) {
+            null, !in 0..player.inventory.size -> {
+                println("无效选择！")
+            }
+
+            0 -> {
+                println("返回游戏...")
+            }
+
+            else -> {
+                val selectedItem = player.inventory[choice - 1]
+                println("你选择了: $selectedItem")
+                println("1. 食用 | 2. 丢弃 | 0. 取消")
+
+                when (readlnOrNull()?.toIntOrNull()) {
+                    1 -> useItem(selectedItem, choice - 1)
+                    2 -> discardItem(choice - 1)
+                    0 -> println("取消操作。")
+                    else -> println("无效选择！")
+                }
+            }
+        }
+    }
+
+    // 使用物品
+    private fun useItem(item: String, index: Int) {
+        when (item) {
+            "苹果" -> {
+                player.health = (player.health + 20).coerceAtMost(100)
+                player.inventory.removeAt(index)
+                println("你食用了苹果，恢复了20点生命值！")
+            }
+
+            else -> {
+                println("这个物品不能食用！")
+            }
+        }
+    }
+
+    // 丢弃物品
+    private fun discardItem(index: Int) {
+        val discardedItem = player.inventory.removeAt(index)
+        currentLocation.items.add(discardedItem)
+        println("你丢弃了: $discardedItem")
+    }
+
 }
 
 fun main() {
