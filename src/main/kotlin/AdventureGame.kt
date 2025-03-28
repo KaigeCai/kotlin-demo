@@ -48,36 +48,16 @@ class Game {
         currentLocation = village
     }
 
-    // 初始化游戏世界
-    private fun initializeWorld() {
-        val village = Location("村庄", "一个宁静的小村庄，村民们过着平静的生活。")
-        val forest = Location("森林", "一片茂密的森林，隐藏着未知的危险。")
-        val cave = Location("洞穴", "一个阴暗的洞穴，传出奇怪的声音。")
-
-        village.exits["北"] = forest
-        forest.exits["南"] = village
-        forest.exits["东"] = cave
-        cave.exits["西"] = forest
-
-        village.items.add("苹果")
-        forest.items.add("木剑")
-
-        locations["村庄"] = village
-        locations["森林"] = forest
-        locations["洞穴"] = cave
-
-        currentLocation = village
-    }
-
     // 游戏主循环
-    fun start() {
-        println("欢迎来到冒险游戏！请输入你的名字：")
-        player.name = readlnOrNull() ?: "冒险者"
-        initializeWorld()
+    fun start(isLoaded: Boolean = false) {
+        if (!isLoaded) {
+            println("欢迎来到冒险游戏！请输入你的名字：")
+            player.name = readlnOrNull() ?: "冒险者"
+        }
         println("你醒来发现自己在${currentLocation.name}。冒险开始了！")
 
         while (true) {
-            println("\n---")
+            println()
             player.showStatus()
             println("你当前在: ${currentLocation.name}")
             println(currentLocation.description)
@@ -198,17 +178,17 @@ class Game {
     fun loadGame() {
         val file = File("SaveGame.txt")
         if (file.exists()) {
-            val lines = file.readLines().filter { it.isNotBlank() } // 过滤掉空行
-            if (lines.size >= 4) { // 至少需要4行有效数据
+            val lines = file.readLines().filter { it.isNotBlank() }
+            if (lines.size >= 4) {
                 player.name = lines[0]
-                player.health = lines[1].toIntOrNull() ?: 100 // 防止转换失败
+                player.health = lines[1].toIntOrNull() ?: 100
                 player.gold = lines[2].toIntOrNull() ?: 10
-                player.inventory = if (lines[3].isNotBlank()) {
+                player.inventory = if (lines[3].isNotBlank() && lines[3] != "村庄") {
                     lines[3].split(",").filter { it.isNotBlank() }.toMutableList()
                 } else {
-                    mutableListOf() // 默认空背包
+                    mutableListOf()
                 }
-                val locationName = if (lines.size > 4) lines[4] else "村庄" // 如果没有第5行，默认村庄
+                val locationName = if (lines.size > 4) lines[4] else lines.getOrElse(3) { "村庄" }
                 currentLocation = locations[locationName] ?: run {
                     println("错误：位置 '$locationName' 未找到，默认回到村庄")
                     locations["村庄"]!!
@@ -227,6 +207,10 @@ fun main() {
     val game = Game()
     println("1. 新游戏 | 2. 加载游戏")
     val choice = readlnOrNull()
-    if (choice == "2") game.loadGame()
-    game.start()
+    if (choice == "2") {
+        game.loadGame()
+        game.start(isLoaded = true)
+    } else {
+        game.start(isLoaded = false)
+    }
 }
