@@ -203,7 +203,7 @@ class Game {
         }
     }
 
-    // 打开背包
+    // 打开背包（支持多选）
     private fun openInventory() {
         if (player.inventory.isEmpty()) {
             println("你的背包是空的！")
@@ -214,25 +214,31 @@ class Game {
         player.inventory.forEachIndexed { index, item ->
             println("${index + 1}. $item")
         }
-        println("输入物品编号选择物品，或输入0返回:")
+        println("输入物品编号(用空格分隔多选)，或输入0返回:")
 
-        when (val choice = readlnOrNull()?.toIntOrNull()) {
-            null, !in 0..player.inventory.size -> {
-                println("无效选择！")
-            }
-
-            0 -> {
+        val input = readlnOrNull()?.trim()
+        when {
+            input == null || input == "0" -> {
                 println("返回游戏...")
+                return
             }
 
             else -> {
-                val selectedItem = player.inventory[choice - 1]
-                println("你选择了: $selectedItem")
+                val selectedIndices = input.split(" ").asSequence().mapNotNull { it.toIntOrNull() }
+                    .filter { it in 1..player.inventory.size }.map { it - 1 }.distinct().sortedDescending()
+                    .toList() // 从大到小排序便于删除操作
+
+                if (selectedIndices.isEmpty()) {
+                    println("无效选择！")
+                    return
+                }
+
+                println("你选择了: ${selectedIndices.joinToString(", ") { player.inventory[it] }}")
                 println("1. 食用 | 2. 丢弃 | 0. 取消")
 
                 when (readlnOrNull()?.toIntOrNull()) {
-                    1 -> useItem(selectedItem, choice - 1)
-                    2 -> discardItem(choice - 1)
+                    1 -> useItems(selectedIndices)
+                    2 -> discardItems(selectedIndices)
                     0 -> println("取消操作。")
                     else -> println("无效选择！")
                 }
@@ -240,28 +246,42 @@ class Game {
         }
     }
 
-    // 使用物品
-    private fun useItem(item: String, index: Int) {
-        when (item) {
-            "苹果" -> {
-                player.health = (player.health + 20).coerceAtMost(100)
-                player.inventory.removeAt(index)
-                println("你食用了苹果，恢复了20点生命值！")
-            }
+    // 批量使用物品
+    private fun useItems(indices: List<Int>) {
+        var healthRestored = 0
+        val itemsToRemove = mutableListOf<Int>()
 
-            else -> {
-                println("这个物品不能食用！")
+        indices.forEach { index ->
+            when (player.inventory[index]) {
+                "苹果" -> {
+                    healthRestored += 20
+                    itemsToRemove.add(index)
+                }
             }
+        }
+
+        if (healthRestored > 0) {
+            // 从大到小删除避免索引错位
+            itemsToRemove.sortedDescending().forEach { index ->
+                player.inventory.removeAt(index)
+            }
+            player.health = (player.health + healthRestored).coerceAtMost(100)
+            println("你食用了${itemsToRemove.size}个苹果，恢复了${healthRestored}点生命值！")
+        } else {
+            println("选中的物品中没有可食用的物品！")
         }
     }
 
-    // 丢弃物品
-    private fun discardItem(index: Int) {
-        val discardedItem = player.inventory.removeAt(index)
-        currentLocation.items.add(discardedItem)
-        println("你丢弃了: $discardedItem")
+    // 批量丢弃物品
+    private fun discardItems(indices: List<Int>) {
+        val discardedItems = mutableListOf<String>()
+        // 从大到小删除避免索引错位
+        indices.sortedDescending().forEach { index ->
+            discardedItems.add(player.inventory.removeAt(index))
+        }
+        currentLocation.items.addAll(discardedItems)
+        println("你丢弃了: ${discardedItems.joinToString(", ")}")
     }
-
 }
 
 fun main() {
