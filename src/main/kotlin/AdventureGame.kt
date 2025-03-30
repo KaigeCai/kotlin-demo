@@ -701,20 +701,24 @@ class Game {
 
     // 保存游戏
     private fun saveGame() {
-        val saveData = """
+        try {
+            val saveData = """
             ${player.name}
             ${player.health}
             ${player.maxHealth}
             ${player.gold}
-            ${player.inventory.joinToString(",")}
-            ${player.activeQuests.joinToString(",")}
-            ${player.completedQuests.joinToString(",")}
+            ${player.inventory.joinToString(",") { it.ifBlank { "null" } }}
+            ${player.activeQuests.joinToString(",") { it.ifBlank { "null" } }}
+            ${player.completedQuests.joinToString(",") { it.ifBlank { "null" } }}
             ${currentLocation.name}
             ${player.equippedWeapon ?: "null"}
             ${player.equippedArmor ?: "null"}
             """.trimIndent()
-        File("SaveGame.txt").writeText(saveData)
-        println("游戏已保存！")
+            File("SaveGame.txt").writeText(saveData)
+            println("游戏已成功保存！")
+        } catch (e: Exception) {
+            println("保存游戏时出错: ${e.message}")
+        }
     }
 
     // 加载游戏
