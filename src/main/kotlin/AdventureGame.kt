@@ -401,19 +401,19 @@ class Game {
 
         Thread.sleep(2000)
 
-        // 30%几率钓到食人鱼，50%普通鱼，20%脱钩
-        when (Random.nextInt(10)) {
-            in 0..2 -> {
+        // 60%食人鱼，30%普通鱼，10%脱钩
+        when (Random.nextInt(100)) {
+            in 0..59 -> {  // 60% 食人鱼
                 fishType = "食人鱼"
                 println("哇！一条凶猛的食人鱼上钩了！")
             }
 
-            in 3..7 -> {
+            in 60..89 -> {  // 30% 普通鱼
                 fishType = "鱼"
                 println("有鱼上钩了！")
             }
 
-            else -> {
+            else -> {  // 10% 脱钩
                 println("鱼儿脱钩了...")
                 isFishing = false
                 return
