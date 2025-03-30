@@ -38,6 +38,30 @@ class Game {
     private val locations = mutableMapOf<String, Location>()
     private var isFirstTime = true
 
+    private var isFishing = false
+    private var fishHooked = false
+    private var fishType = ""
+    private var fishingAttempts = 0
+    private val availableCommands = mutableListOf<String>()
+
+    // 更新可用命令
+    private fun updateAvailableCommands() {
+        availableCommands.clear()
+        availableCommands.addAll(listOf("方向", "打开背包", "保存", "退出"))
+
+        if (currentLocation.items.isNotEmpty()) {
+            availableCommands.add("拾取")
+        }
+
+        if (currentLocation.hasVillager) {
+            availableCommands.add("与村民对话")
+        }
+
+        if (currentLocation.name == "湖泊" && player.inventory.contains("鱼竿")) {
+            availableCommands.add("钓鱼")
+        }
+    }
+
     init {
         val village = Location("村庄", "一个宁静的小村庄，村民们过着平静的生活。").apply {
             hasVillager = true
@@ -54,16 +78,31 @@ class Game {
         }
         val lake = Location("湖泊", "一个清澈的湖泊，周围风景优美。").apply {
             hasVillager = true  // 增加一个湖边村民
-            items.add("鱼竿")
-            items.add("鱼")
         }
 
-        village.exits["北"] = forest
-        village.exits["东"] = lake
-        forest.exits["南"] = village
-        forest.exits["东"] = cave
-        cave.exits["西"] = forest
-        lake.exits["西"] = village
+        // 配置多方向通向湖泊
+        village.exits.apply {
+            put("北", forest)
+            put("东", lake)
+            put("南", lake)  // 新增南方出口
+        }
+
+        forest.exits.apply {
+            put("南", village)
+            put("东", cave)
+            put("北", lake)  // 新增北方出口
+        }
+
+        cave.exits.apply {
+            put("西", forest)
+            put("东", lake)  // 新增东方出口
+        }
+
+        lake.exits.apply {
+            put("西", village)
+            put("东", forest) // 湖泊通向森林
+            put("北", cave)  // 湖泊通向洞穴
+        }
 
         locations["村庄"] = village
         locations["森林"] = forest
@@ -95,11 +134,13 @@ class Game {
             println(currentLocation.description)
             println("可去的方向: ${currentLocation.exits.keys.joinToString(", ")}")
             println("地上有: ${currentLocation.items.joinToString(", ")}")
-            println("输入命令（方向、拾取、与村民对话、打开背包、保存、退出）：")
+            updateAvailableCommands() // 每次循环更新可用命令
+            println("输入命令(${availableCommands.joinToString("、")}): ")
             when (val input = readlnOrNull()?.lowercase(Locale.getDefault())) {
                 "北", "南", "东", "西" -> move(input)
-                "拾取" -> pickUpItem()
-                "与村民对话" -> talkToVillager()
+                "拾取" -> if (availableCommands.contains("拾取")) pickUpItem() else println("当前不能拾取物品")
+                "与村民对话" -> if (availableCommands.contains("与村民对话")) talkToVillager() else println("这里没有村民")
+                "钓鱼" -> if (availableCommands.contains("钓鱼")) startFishing() else println("这里不能钓鱼或你没有鱼竿")
                 "打开背包" -> openInventory()
                 "保存" -> saveGame()
                 "退出" -> {
@@ -250,9 +291,16 @@ class Game {
     // 拾取物品
     private fun pickUpItem() {
         if (currentLocation.items.isNotEmpty()) {
-            val item = currentLocation.items.removeAt(0)
-            player.inventory.add(item)
-            println("你拾取了: $item")
+            val item = currentLocation.items[0]
+            if (item == "鱼竿" && player.activeQuests.contains("钓鱼")) {
+                player.inventory.add(item)
+                currentLocation.items.removeAt(0)
+                println("你拾取了鱼竿。输入'钓鱼'开始钓鱼操作。")
+            } else {
+                val currentItem = currentLocation.items.removeAt(0)
+                player.inventory.add(currentItem)
+                println("你拾取了: $currentItem")
+            }
         } else {
             println("这里没有可拾取的物品。")
         }
@@ -302,27 +350,124 @@ class Game {
                 }
 
                 "湖泊" -> {
-                    if (!player.completedQuests.contains("钓鱼") && !player.activeQuests.contains("钓鱼")) {
-                        println("渔夫说：你好啊，${player.name}！能帮我钓几条鱼吗？")
-                        println("1. 接受任务 | 2. 拒绝")
-                        val choice = readlnOrNull()
-                        if (choice == "1") {
-                            player.activeQuests.add("钓鱼")
-                            println("你接受了任务：钓鱼")
+                    when {
+                        !player.completedQuests.contains("钓鱼") && !player.activeQuests.contains("钓鱼") -> {
+                            println("渔夫说：你好啊，${player.name}！能帮我钓几条鱼吗？我可以借你鱼竿。")
+                            println("1. 接受任务 | 2. 拒绝")
+                            val choice = readlnOrNull()
+                            if (choice == "1") {
+                                player.activeQuests.add("钓鱼")
+                                currentLocation.items.add("鱼竿") // 接受任务后才出现鱼竿
+                                println("你接受了任务：钓鱼")
+                                println("渔夫说：太好了！我把鱼竿放在地上了，拾取它就可以开始钓鱼。")
+                            }
                         }
-                    } else if (player.activeQuests.contains("钓鱼") && player.inventory.contains("鱼")) {
-                        println("渔夫说：哇，你钓到鱼了！太棒了！这是你的奖励。")
-                        player.inventory.remove("鱼")
-                        player.gold += 20
-                        player.activeQuests.remove("钓鱼")
-                        player.completedQuests.add("钓鱼")
-                    } else if (player.activeQuests.contains("钓鱼")) {
-                        println("渔夫说：用鱼竿在湖边钓鱼就能抓到鱼。")
+
+                        player.activeQuests.contains("钓鱼") && player.inventory.contains("鱼") -> {
+                            println("渔夫说：哇，你钓到鱼了！太棒了！这是你的奖励。")
+                            player.inventory.remove("鱼")
+                            player.gold += 20
+                            player.activeQuests.remove("钓鱼")
+                            player.completedQuests.add("钓鱼")
+                        }
+
+                        player.activeQuests.contains("钓鱼") -> {
+                            println("渔夫说：用鱼竿在湖边钓鱼就能抓到鱼。")
+                        }
+
                     }
                 }
             }
         } else {
             println("这里没有村民可以对话。")
+        }
+    }
+
+    // 开始钓鱼方法
+    private fun startFishing() {
+        if (currentLocation.name != "湖泊") {
+            println("这里不是适合钓鱼的地方！")
+            return
+        }
+
+        if (!player.inventory.contains("鱼竿")) {
+            println("你需要鱼竿才能钓鱼！")
+            return
+        }
+
+        isFishing = true
+        fishingAttempts++
+        println("你甩出了鱼线...等待鱼儿上钩...")
+
+        Thread.sleep(2000)
+
+        // 30%几率钓到食人鱼，50%普通鱼，20%脱钩
+        when (Random.nextInt(10)) {
+            in 0..2 -> {
+                fishType = "食人鱼"
+                println("哇！一条凶猛的食人鱼上钩了！")
+            }
+
+            in 3..7 -> {
+                fishType = "鱼"
+                println("有鱼上钩了！")
+            }
+
+            else -> {
+                println("鱼儿脱钩了...")
+                isFishing = false
+                return
+            }
+        }
+
+        fishHooked = true
+        handleFishFight()
+    }
+
+    private fun handleFishFight() {
+        var fishStamina = Random.nextInt(3, 6)
+        var playerStamina = 5
+
+        while (fishHooked && fishStamina > 0 && playerStamina > 0) {
+            println("\n鱼在猛烈挣扎！(鱼体力: $fishStamina, 你的体力: $playerStamina)")
+            println("快速按下1收线！")
+
+            val input = readlnOrNull()
+            if (input == "1") {
+                fishStamina--
+                println("你成功收线！")
+            } else {
+                playerStamina--
+                println("反应太慢！你失去了平衡。")
+            }
+
+            // 食人鱼有额外伤害
+            if (fishType == "食人鱼" && Random.nextBoolean()) {
+                val damage = Random.nextInt(5, 10)
+                player.health -= damage
+                println("食人鱼咬了你！失去${damage}点生命值。")
+            }
+        }
+
+        if (fishStamina <= 0) {
+            println("成功钓到了一条$fishType！")
+            player.inventory.add(fishType)
+            if (fishType == "食人鱼") {
+                println("这只食人鱼还在挣扎！小心处理！")
+            }
+        } else {
+            println("鱼儿逃脱了...")
+        }
+
+        isFishing = false
+        fishHooked = false
+
+        // 钓鱼后有一定几率损坏鱼竿
+        if (fishingAttempts > 0 && fishingAttempts % 3 == 0) {
+            if (Random.nextBoolean()) {
+                player.inventory.remove("鱼竿")
+                println("你的鱼竿损坏了！")
+            }
         }
     }
 
@@ -501,6 +646,7 @@ class Game {
     private fun useItems(indices: List<Int>) {
         var healthRestored = 0
         val itemsToRemove = mutableListOf<Int>()
+        var curedPoison = false
 
         indices.forEach { index ->
             when (player.inventory[index]) {
@@ -516,6 +662,7 @@ class Game {
 
                 "草药" -> {
                     healthRestored += 40
+                    curedPoison = true
                     itemsToRemove.add(index)
                 }
             }
@@ -527,6 +674,9 @@ class Game {
             }
             player.health = (player.health + healthRestored).coerceAtMost(100)
             println("你恢复了${healthRestored}点生命值！")
+            if (curedPoison) {
+                println("草药治愈了你的身体！")
+            }
         } else {
             println("选中的物品中没有可食用的物品！")
         }
