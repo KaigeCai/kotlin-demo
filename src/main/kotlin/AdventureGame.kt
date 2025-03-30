@@ -21,7 +21,18 @@ class Player {
         println("玩家: $name | 生命值: $health/$maxHealth | 金币: $gold")
         println("攻击力: ${5 + attackBonus} | 防御力: $defenseBonus")
         println("装备: 武器-${equippedWeapon ?: "无"} | 护甲-${equippedArmor ?: "无"}")
-        println("背包: ${inventory.joinToString(", ")}")
+
+        // 修改背包显示逻辑
+        if (inventory.isEmpty()) {
+            println("背包: 空")
+        } else {
+            val groupedItems = inventory.groupingBy { it }.eachCount()
+            val inventoryDisplay = groupedItems.entries.joinToString(", ") {
+                if (it.value > 1) "${it.key}x${it.value}" else it.key
+            }
+            println("背包: $inventoryDisplay")
+        }
+
         if (activeQuests.isNotEmpty()) {
             println("进行中的任务: ${activeQuests.joinToString(", ")}")
         }
@@ -447,15 +458,26 @@ class Game {
     // 拾取物品
     private fun pickUpItem() {
         if (currentLocation.items.isNotEmpty()) {
-            val item = currentLocation.items[0]
-            if (item == "鱼竿" && player.activeQuests.contains("钓鱼")) {
+            // 检查是否有鱼竿任务相关物品
+            val fishingRodIndex = currentLocation.items.indexOfFirst { it == "鱼竿" }
+            if (fishingRodIndex != -1 && player.activeQuests.contains("钓鱼")) {
+                val item = currentLocation.items.removeAt(fishingRodIndex)
                 player.inventory.add(item)
-                currentLocation.items.removeAt(0)
                 println("你拾取了鱼竿。输入'钓鱼'开始钓鱼操作。")
+
+                // 继续拾取其他物品
+                if (currentLocation.items.isNotEmpty()) {
+                    val remainingItems = currentLocation.items.toList()
+                    player.inventory.addAll(remainingItems)
+                    currentLocation.items.clear()
+                    println("你还拾取了: ${remainingItems.joinToString(", ")}")
+                }
             } else {
-                val currentItem = currentLocation.items.removeAt(0)
-                player.inventory.add(currentItem)
-                println("你拾取了: $currentItem")
+                // 一次性拾取所有物品
+                val pickedItems = currentLocation.items.toList()
+                player.inventory.addAll(pickedItems)
+                currentLocation.items.clear()
+                println("你拾取了: ${pickedItems.joinToString(", ")}")
             }
         } else {
             println("这里没有可拾取的物品。")
@@ -659,16 +681,14 @@ class Game {
                 println("你击败了$enemy！获得 $reward 金币。")
                 player.gold += reward
 
-                if (Random.nextBoolean()) {
-                    val loot = when (enemy) {
-                        "野狼" -> "狼皮"
-                        "毒蜘蛛" -> "蜘蛛毒液"
-                        "强盗" -> "钱袋"
-                        else -> "未知物品"
-                    }
-                    println("${enemy}掉落了: $loot")
-                    player.inventory.add(loot)
+                val loot = when (enemy) {
+                    "野狼" -> "狼皮"
+                    "毒蜘蛛" -> "蜘蛛毒液"
+                    "强盗" -> "钱袋"
+                    else -> "未知物品"
                 }
+                println("${enemy}掉落了: $loot")
+                player.inventory.add(loot)
             }
             if (player.health <= 0) {
                 println("你被击败了！游戏结束。")
@@ -763,9 +783,11 @@ class Game {
         }
 
         println("背包物品:")
-        player.inventory.forEachIndexed { index, item ->
-            println("${index + 1}. $item")
+        val groupedItems = player.inventory.groupingBy { it }.eachCount()
+        groupedItems.entries.forEachIndexed { index, entry ->
+            println("${index + 1}. ${entry.key}${if (entry.value > 1) "x${entry.value}" else ""}")
         }
+
         println("输入物品编号(用空格分隔多选)，或输入0返回:")
 
         val input = readlnOrNull()?.trim()
@@ -776,20 +798,27 @@ class Game {
             }
 
             else -> {
-                val selectedIndices = input.split(" ").asSequence().mapNotNull { it.toIntOrNull() }
-                    .filter { it in 1..player.inventory.size }.map { it - 1 }.distinct().sortedDescending().toList()
+                val itemList = groupedItems.keys.toList()
+                val selectedIndices = input.split(" ").asSequence()
+                    .mapNotNull { it.toIntOrNull() }
+                    .filter { it in 1..itemList.size }
+                    .map { it - 1 }
+                    .distinct()
+                    .sortedDescending()
+                    .toList()
 
                 if (selectedIndices.isEmpty()) {
                     println("无效选择！")
                     return
                 }
 
-                println("你选择了: ${selectedIndices.joinToString(", ") { player.inventory[it] }}")
+                val selectedItems = selectedIndices.map { itemList[it] }
+                println("你选择了: ${selectedItems.joinToString(", ")}")
                 println("1. 食用 | 2. 丢弃 | 0. 取消")
 
                 when (readlnOrNull()?.toIntOrNull()) {
-                    1 -> useItems(selectedIndices)
-                    2 -> discardItems(selectedIndices)
+                    1 -> useItems(selectedItems)
+                    2 -> discardItems(selectedItems)
                     0 -> println("取消操作。")
                     else -> println("无效选择！")
                 }
@@ -798,34 +827,34 @@ class Game {
     }
 
     // 批量使用物品
-    private fun useItems(indices: List<Int>) {
+    private fun useItems(selectedItems: List<String>) {
         var healthRestored = 0
-        val itemsToRemove = mutableListOf<Int>()
+        val itemsToRemove = mutableListOf<String>()
         var curedPoison = false
 
-        indices.forEach { index ->
-            when (player.inventory[index]) {
+        selectedItems.forEach { item ->
+            when (item) {
                 "苹果" -> {
                     healthRestored += 20
-                    itemsToRemove.add(index)
+                    itemsToRemove.add(item)
                 }
 
                 "面包" -> {
                     healthRestored += 30
-                    itemsToRemove.add(index)
+                    itemsToRemove.add(item)
                 }
 
                 "草药" -> {
                     healthRestored += 40
                     curedPoison = true
-                    itemsToRemove.add(index)
+                    itemsToRemove.add(item)
                 }
             }
         }
 
         if (healthRestored > 0) {
-            itemsToRemove.sortedDescending().forEach { index ->
-                player.inventory.removeAt(index)
+            itemsToRemove.forEach { item ->
+                player.inventory.remove(item)
             }
             player.health = (player.health + healthRestored).coerceAtMost(player.maxHealth)
             println("你恢复了${healthRestored}点生命值！")
@@ -838,13 +867,12 @@ class Game {
     }
 
     // 批量丢弃物品
-    private fun discardItems(indices: List<Int>) {
-        val discardedItems = mutableListOf<String>()
-        indices.sortedDescending().forEach { index ->
-            discardedItems.add(player.inventory.removeAt(index))
+    private fun discardItems(selectedItems: List<String>) {
+        selectedItems.forEach { item ->
+            player.inventory.remove(item)
         }
-        currentLocation.items.addAll(discardedItems)
-        println("你丢弃了: ${discardedItems.joinToString(", ")}")
+        currentLocation.items.addAll(selectedItems)
+        println("你丢弃了: ${selectedItems.joinToString(", ")}")
     }
 }
 
