@@ -54,26 +54,17 @@ class Game {
 
     // 商店物品及价格
     private val shopItems = mapOf(
-        "宝剑" to 50,
-        "机枪" to 150,
-        "火箭弹" to 300,
-        "振金铠甲" to 200,
-        "钢铁侠铠甲" to 500,
-        "满血瓶" to 30
+        "宝剑" to 50, "机枪" to 150, "火箭弹" to 300, "振金铠甲" to 200, "钢铁侠铠甲" to 500, "满血瓶" to 30
     )
 
     // 武器攻击力
     private val weaponStats = mapOf(
-        "木剑" to 10,
-        "宝剑" to 50,
-        "机枪" to 88,
-        "火箭弹" to 333
+        "木剑" to 10, "宝剑" to 50, "机枪" to 88, "火箭弹" to 333
     )
 
     // 护甲防御力
     private val armorStats = mapOf(
-        "振金铠甲" to 1000,
-        "钢铁侠铠甲" to 888
+        "振金铠甲" to 1000, "钢铁侠铠甲" to 888
     )
 
     // 更新可用命令
@@ -702,18 +693,18 @@ class Game {
     // 保存游戏
     private fun saveGame() {
         try {
-            val saveData = """
-            ${player.name}
-            ${player.health}
-            ${player.maxHealth}
-            ${player.gold}
-            ${player.inventory.joinToString(",") { it.ifBlank { "null" } }}
-            ${player.activeQuests.joinToString(",") { it.ifBlank { "null" } }}
-            ${player.completedQuests.joinToString(",") { it.ifBlank { "null" } }}
-            ${currentLocation.name}
-            ${player.equippedWeapon ?: "null"}
-            ${player.equippedArmor ?: "null"}
-            """.trimIndent()
+            val saveData = buildString {
+                appendLine("玩家姓名:${player.name}")
+                appendLine("生命值:${player.health}")
+                appendLine("最大生命值:${player.maxHealth}")
+                appendLine("金币:${player.gold}")
+                appendLine("背包:${player.inventory.joinToString(",")}")
+                appendLine("进行中的任务:${player.activeQuests.joinToString(",")}")
+                appendLine("已完成的任务:${player.completedQuests.joinToString(",")}")
+                appendLine("当前位置:${currentLocation.name}")
+                appendLine("装备武器:${player.equippedWeapon ?: "无"}")
+                appendLine("装备护甲:${player.equippedArmor ?: "无"}")
+            }
             File("SaveGame.txt").writeText(saveData)
             println("游戏已成功保存！")
         } catch (e: Exception) {
@@ -725,41 +716,39 @@ class Game {
     fun loadGame() {
         val file = File("SaveGame.txt")
         if (file.exists()) {
-            val lines = file.readLines().filter { it.isNotBlank() }
-            if (lines.size >= 10) {
-                player.name = lines[0]
-                player.health = lines[1].toIntOrNull() ?: 100
-                player.maxHealth = lines[2].toIntOrNull() ?: 100
-                player.gold = lines[3].toIntOrNull() ?: 10
-                player.inventory = if (lines[4].isNotBlank()) {
-                    lines[4].split(",").filter { it.isNotBlank() }.toMutableList()
-                } else {
-                    mutableListOf()
-                }
-                player.activeQuests = if (lines[5].isNotBlank()) {
-                    lines[5].split(",").filter { it.isNotBlank() }.toMutableList()
-                } else {
-                    mutableListOf()
-                }
-                player.completedQuests = if (lines[6].isNotBlank()) {
-                    lines[6].split(",").filter { it.isNotBlank() }.toMutableList()
-                } else {
-                    mutableListOf()
-                }
-                val locationName = lines[7]
-                currentLocation = locations[locationName] ?: run {
-                    println("错误：位置 '$locationName' 未找到，默认回到村庄")
-                    locations["村庄"]!!
+            try {
+                val saveData = mutableMapOf<String, String>()
+                file.readLines().filter { it.isNotBlank() }.forEach { line ->
+                    val parts = line.split(":", limit = 2)
+                    if (parts.size == 2) {
+                        saveData[parts[0]] = parts[1]
+                    }
                 }
 
-                player.equippedWeapon = if (lines[8] != "null") lines[8] else null
-                player.equippedArmor = if (lines[9] != "null") lines[9] else null
+                player.name = saveData["玩家姓名"] ?: "冒险者"
+                player.health = saveData["生命值"]?.toIntOrNull() ?: 100
+                player.maxHealth = saveData["最大生命值"]?.toIntOrNull() ?: 100
+                player.gold = saveData["金币"]?.toIntOrNull() ?: 10
+
+                player.inventory =
+                    saveData["背包"]?.split(",")?.filter { it.isNotBlank() }?.toMutableList() ?: mutableListOf()
+                player.activeQuests =
+                    saveData["进行中的任务"]?.split(",")?.filter { it.isNotBlank() }?.toMutableList() ?: mutableListOf()
+                player.completedQuests =
+                    saveData["已完成的任务"]?.split(",")?.filter { it.isNotBlank() }?.toMutableList() ?: mutableListOf()
+
+                val locationName = saveData["当前位置"] ?: "村庄"
+                currentLocation = locations[locationName] ?: locations["村庄"]!!
+
+                player.equippedWeapon = saveData["装备武器"]?.takeIf { it != "无" }
+                player.equippedArmor = saveData["装备护甲"]?.takeIf { it != "无" }
+
                 player.attackBonus = player.equippedWeapon?.let { weaponStats[it] ?: 0 } ?: 0
                 player.defenseBonus = player.equippedArmor?.let { armorStats[it] ?: 0 } ?: 0
 
                 println("游戏已加载！")
-            } else {
-                println("保存文件格式错误，至少需要10行有效数据。")
+            } catch (e: Exception) {
+                println("加载游戏时出错: ${e.message}")
             }
         } else {
             println("没有找到保存的游戏。")
