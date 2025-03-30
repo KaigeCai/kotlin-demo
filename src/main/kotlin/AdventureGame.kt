@@ -128,9 +128,123 @@ class Game {
         if (newLocation != null) {
             currentLocation = newLocation
             println("你移动到了${currentLocation.name}。")
+
+            // 检查是否是危险地点并触发敌人
+            when (currentLocation.name) {
+                "森林" -> {
+                    println("这片茂密的森林中隐藏着危险...")
+                    Thread.sleep(1000) // 增加 suspense
+                    triggerEnemy("森林")
+                }
+
+                "洞穴" -> {
+                    println("洞穴中传出奇怪的声音...")
+                    Thread.sleep(1000)
+                    triggerEnemy("洞穴")
+                }
+            }
         } else {
             println("你不能往那个方向走！")
         }
+    }
+
+    // 特定地点触发特定敌人
+    private fun triggerEnemy(location: String) {
+        val enemies = when (location) {
+            "森林" -> listOf("强盗", "野狼", "毒蜘蛛")
+            "洞穴" -> listOf("毒蜘蛛")
+            else -> emptyList()
+        }
+
+        if (enemies.isNotEmpty()) {
+            val enemy = enemies.random()
+            startCombat(enemy)
+        }
+    }
+
+    // 重构战斗逻辑到独立方法
+    private fun startCombat(enemy: String) {
+        println("一只${enemy}突然跳了出来！")
+        var enemyHealth = when (enemy) {
+            "野狼" -> 20
+            "毒蜘蛛" -> 15
+            "强盗" -> 30
+            else -> 20
+        }
+
+        while (enemyHealth > 0 && player.health > 0) {
+            println("${enemy}生命值: $enemyHealth | 你的生命值: ${player.health}")
+            println("1. 攻击 | 2. 逃跑")
+
+            when (readlnOrNull()) {
+                "1" -> {
+                    val damage = calculatePlayerDamage()
+                    enemyHealth -= damage
+                    println("你对${enemy}造成了 $damage 点伤害！")
+
+                    if (enemyHealth > 0) {
+                        val enemyDamage = calculateEnemyDamage(enemy)
+                        player.health -= enemyDamage
+                        println("${enemy}对你造成了 $enemyDamage 点伤害！")
+                    }
+                }
+
+                "2" -> {
+                    if (attemptEscape()) {
+                        println("你成功逃跑了！")
+                        return
+                    } else {
+                        println("逃跑失败！")
+                        val enemyDamage = calculateEnemyDamage(enemy)
+                        player.health -= enemyDamage
+                        println("${enemy}对你造成了 $enemyDamage 点伤害！")
+                    }
+                }
+
+                else -> println("无效输入，自动选择攻击！")
+            }
+        }
+
+        if (enemyHealth <= 0) {
+            val reward = calculateReward(enemy)
+            println("你击败了$enemy！获得 $reward 金币。")
+            player.gold += reward
+        }
+
+        if (player.health <= 0) {
+            println("你被击败了！游戏结束。")
+            exitProcess(0)
+        }
+    }
+
+    // 辅助方法计算各种数值
+    private fun calculatePlayerDamage(): Int {
+        return when {
+            player.inventory.contains("木剑") -> Random.nextInt(10, 20)
+            else -> Random.nextInt(5, 10)
+        }
+    }
+
+    private fun calculateEnemyDamage(enemy: String): Int {
+        return when (enemy) {
+            "野狼" -> Random.nextInt(5, 10)
+            "毒蜘蛛" -> Random.nextInt(8, 13) // 毒蜘蛛伤害更高
+            "强盗" -> Random.nextInt(10, 15) // 强盗伤害最高
+            else -> Random.nextInt(5, 10)
+        }
+    }
+
+    private fun calculateReward(enemy: String): Int {
+        return when (enemy) {
+            "野狼" -> 5
+            "毒蜘蛛" -> 8
+            "强盗" -> 15
+            else -> 5
+        }
+    }
+
+    private fun attemptEscape(): Boolean {
+        return Random.nextFloat() < 0.5f // 50%逃跑成功率
     }
 
     // 拾取物品
