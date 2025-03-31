@@ -87,6 +87,19 @@ class Game {
         "钢铁侠铠甲" to 888
     )
 
+    // 物品售价
+    private val itemPrices = mapOf(
+        "钱袋" to 1000,
+        "食人鱼" to 800,
+        "狼皮" to 300,
+        "蜘蛛毒液" to 500,
+        "矿石" to 150,
+        "苹果" to 10,
+        "面包" to 15,
+        "草药" to 25,
+        "火把" to 30
+    )
+
     // 更新可用命令
     private fun updateAvailableCommands() {
         availableCommands.clear()
@@ -212,6 +225,19 @@ class Game {
     private fun openShop() {
         println("\n=== 商店 ===")
         println("你的金币: ${player.gold}")
+        println("1. 购买 | 2. 出售 | 0. 返回")
+
+        when (readlnOrNull()?.toIntOrNull()) {
+            1 -> showBuyMenu()
+            2 -> showSellMenu()
+            0 -> return
+            else -> println("无效选择！")
+        }
+    }
+
+    private fun showBuyMenu() {
+        println("\n=== 购买 ===")
+        println("你的金币: ${player.gold}")
         shopItems.forEach { (item, price) ->
             println("$item - $price 金币")
         }
@@ -255,6 +281,69 @@ class Game {
             }
 
             else -> println("商店没有这个物品！")
+        }
+    }
+
+    private fun showSellMenu() {
+        if (player.inventory.isEmpty()) {
+            println("你的背包是空的，没有物品可以出售！")
+            return
+        }
+
+        println("\n=== 出售 ===")
+        println("你的金币: ${player.gold}")
+        println("背包物品:")
+
+        val sellableItems = player.inventory.filter { itemPrices.containsKey(it) }
+        if (sellableItems.isEmpty()) {
+            println("没有可以出售的物品！")
+            return
+        }
+
+        val groupedItems = sellableItems.groupingBy { it }.eachCount()
+        groupedItems.entries.forEachIndexed { index, entry ->
+            val price = itemPrices[entry.key] ?: 0
+            println("${index + 1}. ${entry.key}x${entry.value} - 单价:$price 金币")
+        }
+        println("输入要出售的物品编号和数量(如:1 2表示出售第一个物品2个)，或输入0返回:")
+
+        val input = readlnOrNull()?.trim()?.split(" ")
+        when {
+            input == null || input.size !in 1..2 || input[0] == "0" -> return
+            else -> {
+                val itemIndex = input[0].toIntOrNull()?.minus(1)
+                val itemCount = input.getOrNull(1)?.toIntOrNull() ?: 1
+
+                if (itemIndex == null || itemIndex !in groupedItems.keys.indices) {
+                    println("无效的物品编号！")
+                    return
+                }
+
+                val selectedItem = groupedItems.keys.elementAt(itemIndex)
+                val availableCount = groupedItems[selectedItem] ?: 0
+
+                if (itemCount <= 0 || itemCount > availableCount) {
+                    println("无效的数量！")
+                    return
+                }
+
+                val price = itemPrices[selectedItem] ?: 0
+                val totalPrice = price * itemCount
+
+                // 确认出售
+                println("确定以${totalPrice}金币出售${selectedItem}x${itemCount}吗？(1. 是 | 2. 否)")
+                when (readlnOrNull()?.toIntOrNull()) {
+                    1 -> {
+                        repeat(itemCount) {
+                            player.inventory.remove(selectedItem)
+                        }
+                        player.gold += totalPrice
+                        println("出售成功！获得${totalPrice}金币。")
+                    }
+
+                    else -> println("取消出售。")
+                }
+            }
         }
     }
 
