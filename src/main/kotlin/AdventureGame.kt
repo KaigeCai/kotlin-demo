@@ -23,6 +23,10 @@ class Player {
     var defenseBonus: Int = 0
     var maxHealth: Int = baseMaxHealth + defenseBonus
 
+    var lastRestTime: Long = System.currentTimeMillis()
+    val restCooldown: Long = 60000 // 1分钟冷却时间
+    val restHealAmount: Int = 30 // 每次休息恢复的生命值
+
     fun showStatus() {
         println("玩家: $name | 生命值: $health/$maxHealth | 金币: $gold")
         println("攻击力: ${5 + attackBonus} | 防御力: $defenseBonus")
@@ -45,10 +49,10 @@ class Player {
         }
 
         if (activeQuests.isNotEmpty()) {
-            println("进行中的任务: ${activeQuests.joinToString(", ")}")
+            println("进行中的任务: ${activeQuests.distinct().joinToString(", ")}")
         }
         if (completedQuests.isNotEmpty()) {
-            println("已完成的任务: ${completedQuests.joinToString(", ")}")
+            println("已完成的任务: ${completedQuests.distinct().joinToString(", ")}")
         }
     }
 }
@@ -111,7 +115,7 @@ class Game {
     // 更新可用命令
     private fun updateAvailableCommands() {
         availableCommands.clear()
-        availableCommands.addAll(listOf("方向", "背包", "商店", "装备", "保存", "退出"))
+        availableCommands.addAll(listOf("方向", "背包", "商店", "装备", "保存", "退出", "村庄"))
 
         if (currentLocation.items.isNotEmpty()) {
             availableCommands.add("拾取")
@@ -191,7 +195,6 @@ class Game {
         }
 
         while (true) {
-            println()
             player.showStatus()
             println("你当前在: ${currentLocation.name}")
             println(currentLocation.description)
@@ -210,6 +213,7 @@ class Game {
                 "钓鱼" -> if (availableCommands.contains("钓鱼")) startFishing() else println("这里不能钓鱼或你没有鱼竿")
                 "背包" -> openInventory()
                 "保存" -> saveGame()
+                "村庄" -> returnToVillage()
                 "退出" -> {
                     println("感谢游玩！")
                     break
@@ -220,7 +224,7 @@ class Game {
 
             if (Random.nextInt(10) < 4) {
                 if (Random.nextBoolean() && currentLocation.name != "村庄") {
-                    randomEvent()
+                    triggerCombat()
                 } else if (currentLocation.hasVillager) {
                     println("\n一位村民向你走来...")
                     talkToVillager()
@@ -465,13 +469,17 @@ class Game {
                 "森林" -> {
                     println("这片茂密的森林中隐藏着危险...")
                     Thread.sleep(1000)
-                    triggerEnemy("森林")
+                    triggerCombat()
                 }
 
                 "洞穴" -> {
                     println("洞穴中传出奇怪的声音...")
                     Thread.sleep(1000)
-                    triggerEnemy("洞穴")
+                    triggerCombat()
+                }
+
+                "村庄" -> {
+                    checkRestInVillage()
                 }
             }
         } else {
@@ -479,70 +487,77 @@ class Game {
         }
     }
 
-    // 特定地点触发特定敌人
-    private fun triggerEnemy(location: String) {
-        val enemies = when (location) {
-            "森林" -> listOf("强盗", "野狼", "毒蜘蛛")
-            "洞穴" -> listOf("毒蜘蛛", "蝙蝠")
-            else -> emptyList()
+    // 触发敌人并战斗
+    private fun triggerCombat() {
+        val enemy = when (currentLocation.name) {
+            "森林" -> listOf("强盗", "野狼").random()
+            "洞穴" -> listOf("毒蜘蛛", "蝙蝠").random()
+            else -> null
         }
+        enemy?.let {
+            println("一只${enemy}突然跳了出来！")
+            var enemyHealth = when (enemy) {
+                "野狼" -> 20
+                "毒蜘蛛" -> 15
+                "强盗" -> 300
+                "蝙蝠" -> 80
+                else -> 0
+            }
 
-        if (enemies.isNotEmpty()) {
-            val enemy = enemies.random()
-            startCombat(enemy)
-        }
-    }
+            while (enemyHealth > 0 && player.health > 0) {
+                println("${enemy}生命值: $enemyHealth | 你的生命值: ${player.health}")
+                println("1. 攻击 | 2. 逃跑")
 
-    // 战斗逻辑
-    private fun startCombat(enemy: String) {
-        println("一只${enemy}突然跳了出来！")
-        var enemyHealth = when (enemy) {
-            "野狼" -> 20
-            "毒蜘蛛" -> 15
-            "强盗" -> 300
-            else -> 20
-        }
-
-        while (enemyHealth > 0 && player.health > 0) {
-            println("${enemy}生命值: $enemyHealth | 你的生命值: ${player.health}")
-            println("1. 攻击 | 2. 逃跑")
-
-            when (readlnOrNull()) {
-                "1" -> {
-                    enemyHealth = damage(enemyHealth, enemy)
-                }
-
-                "2" -> {
-                    if (attemptEscape()) {
-                        println("你成功逃跑了！")
-                        return
-                    } else {
-                        println("逃跑失败！")
-                        val enemyDamage = (calculateEnemyDamage(enemy) - player.defenseBonus).coerceAtLeast(1)
-                        player.health -= enemyDamage
-                        println("${enemy}对你造成了 $enemyDamage 点伤害！")
+                when (readlnOrNull()) {
+                    "1" -> {
+                        enemyHealth = damage(enemyHealth, enemy)
                     }
+
+                    "2" -> {
+                        if (attemptEscape()) {
+                            println("你成功逃跑了！")
+                            return
+                        } else {
+                            println("逃跑失败！")
+                            val enemyDamage = (calculateEnemyDamage(enemy) - player.defenseBonus).coerceAtLeast(1)
+                            player.health -= enemyDamage
+                            println("${enemy}对你造成了 $enemyDamage 点伤害！")
+                        }
+                    }
+
+                    else -> println("无效输入，自动选择攻击！")
+                }
+            }
+
+            if (enemyHealth <= 0) {
+                val reward = calculateReward(enemy)
+                println("你击败了$enemy！获得 $reward 金币。")
+                player.gold += reward
+
+                // 如果是强盗且任务进行中，增加计数
+                if (enemy == "强盗" && player.activeQuests.contains(banditQuestName)) {
+                    banditsDefeated++
+                    println("(任务进度: $banditsDefeated/$banditQuestRequirement)")
                 }
 
-                else -> println("无效输入，自动选择攻击！")
+                // 随机掉落物品
+                val loot = when (enemy) {
+                    "野狼" -> listOf("狼皮")
+                    "毒蜘蛛" -> listOf("蜘蛛毒液")
+                    "强盗" -> listOf("钱袋", "手枪", "短剑", "皮甲", "强盗徽章", "烈酒")
+                    "蝙蝠" -> listOf("蝙蝠翅膀", "蝙蝠牙齿")
+                    else -> emptyList()
+                }
+                if (loot.isNotEmpty()) {
+                    println("${enemy}掉落了: $loot")
+                    player.inventory.addAll(loot)
+                }
             }
-        }
 
-        if (enemyHealth <= 0) {
-            val reward = calculateReward(enemy)
-            println("你击败了$enemy！获得 $reward 金币。")
-            player.gold += reward
-
-            // 如果是强盗且任务进行中，增加计数
-            if (enemy == "强盗" && player.activeQuests.contains(banditQuestName)) {
-                banditsDefeated++
-                println("(任务进度: $banditsDefeated/$banditQuestRequirement)")
+            if (player.health <= 0) {
+                println("你被击败了！游戏结束。")
+                exitProcess(0)
             }
-        }
-
-        if (player.health <= 0) {
-            println("你被击败了！游戏结束。")
-            exitProcess(0)
         }
     }
 
@@ -820,60 +835,6 @@ class Game {
         }
     }
 
-    // 随机事件
-    private fun randomEvent() {
-        if (!currentLocation.hasVillager) {
-            val enemies = listOf("野狼", "毒蜘蛛", "强盗", "蝙蝠")
-            val enemy = enemies.random()
-            println("一只${enemy}突然跳了出来！")
-            var enemyHealth = when (enemy) {
-                "野狼" -> 20
-                "毒蜘蛛" -> 15
-                "强盗" -> 30
-                "蝙蝠" -> 80
-                else -> 0
-            }
-
-            while (enemyHealth > 0 && player.health > 0) {
-                println("${enemy}生命值: $enemyHealth | 你的生命值: ${player.health}")
-                println("1. 攻击 | 2. 逃跑")
-                val choice = readlnOrNull()
-                if (choice == "1") {
-                    enemyHealth = damage(enemyHealth, enemy)
-                } else {
-                    if (attemptEscape()) {
-                        println("你成功逃跑了！")
-                        break
-                    } else {
-                        println("逃跑失败！")
-                        val enemyDamage = (calculateEnemyDamage(enemy) - player.defenseBonus).coerceAtLeast(1)
-                        player.health -= enemyDamage
-                        println("${enemy}对你造成了 $enemyDamage 点伤害！")
-                    }
-                }
-            }
-            if (enemyHealth <= 0) {
-                val reward = calculateReward(enemy)
-                println("你击败了$enemy！获得 $reward 金币。")
-                player.gold += reward
-
-                val loot = when (enemy) {
-                    "野狼" -> listOf("狼皮")
-                    "毒蜘蛛" -> listOf("蜘蛛毒液")
-                    "强盗" -> listOf("钱袋", "手枪", "短剑", "皮甲", "强盗徽章", "烈酒")
-                    "蝙蝠" -> listOf("蝙蝠翅膀", "蝙蝠牙齿")
-                    else -> listOf("未知物品")
-                }
-                println("${enemy}掉落了: $loot")
-                player.inventory.addAll(loot)
-            }
-            if (player.health <= 0) {
-                println("你被击败了！游戏结束。")
-                exitProcess(0)
-            }
-        }
-    }
-
     private fun damage(enemyHealth: Int, enemy: String): Int {
         var enemyHP = enemyHealth
         val damage = calculatePlayerDamage()
@@ -1053,6 +1014,34 @@ class Game {
         }
         currentLocation.items.addAll(selectedItems)
         println("你丢弃了: ${selectedItems.joinToString(", ")}")
+    }
+
+    // 返回村庄功能
+    private fun returnToVillage() {
+        val village = locations["村庄"] ?: return
+        currentLocation = village
+        println("你使用传送卷轴回到了村庄！")
+
+        // 检查是否可以进行休息
+        checkRestInVillage()
+    }
+
+    // 村庄休息功能
+    private fun checkRestInVillage() {
+        if (currentLocation.name != "村庄") return
+
+        val currentTime = System.currentTimeMillis()
+        val timeSinceLastRest = currentTime - player.lastRestTime
+
+        if (timeSinceLastRest >= player.restCooldown) {
+            player.health = (player.health + player.restHealAmount).coerceAtMost(player.maxHealth)
+            player.lastRestTime = currentTime
+            println("你在村庄休息了一会，恢复了${player.restHealAmount}点生命值。")
+            println("当前生命值: ${player.health}/${player.maxHealth}")
+        } else {
+            val remainingTime = (player.restCooldown - timeSinceLastRest) / 1000
+            println("你还太疲惫，需要等待${remainingTime}秒才能再次休息。")
+        }
     }
 }
 
