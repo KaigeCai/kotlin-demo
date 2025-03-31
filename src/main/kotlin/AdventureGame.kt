@@ -7,6 +7,7 @@ import kotlin.system.exitProcess
 private const val banditQuestName = "剿灭强盗"
 private const val banditQuestRequirement = 5 // 需要击败的强盗数量
 private var banditsDefeated = 0 // 记录已击败强盗数量
+private var shouldWarnAboutBoss = false
 
 // 玩家类
 class Player {
@@ -28,13 +29,18 @@ class Player {
     val restHealAmount: Int = 30 // 每次休息恢复的生命值
 
     fun showStatus() {
-        println("玩家: $name | 生命值: $health/$maxHealth | 金币: $gold")
+        println("\n玩家: $name | 生命值: $health/$maxHealth | 金币: $gold")
         println("攻击力: ${5 + attackBonus} | 防御力: $defenseBonus")
         println("装备: 武器-${equippedWeapon ?: "无"} | 护甲-${equippedArmor ?: "无"}")
 
         // 显示剿灭强盗任务进度
         if (activeQuests.contains(banditQuestName)) {
             println("剿灭强盗进度: $banditQuestName ($banditsDefeated/$banditQuestRequirement)")
+        }
+
+        // 添加Boss战提示
+        if (shouldWarnAboutBoss) {
+            println("警告: 所有任务已完成，洞穴深处似乎有强大的存在苏醒了...")
         }
 
         // 修改背包显示逻辑
@@ -66,6 +72,12 @@ class Location(val name: String, val description: String) {
 
 // 游戏类
 class Game {
+    private var finalBossHealth = FINAL_BOSS_MAX_HEALTH
+    private var finalBossPhase = 1
+    private var finalBossDefeated = false
+    private var princessRescued = false
+    private var finalBattleTriggered = false
+
     private var player = Player()
     private var currentLocation: Location
     private val locations = mutableMapOf<String, Location>()
@@ -195,6 +207,7 @@ class Game {
         }
 
         while (true) {
+            shouldWarnAboutBoss = checkAllQuestsCompleted() && !finalBossDefeated
             player.showStatus()
             println("你当前在: ${currentLocation.name}")
             println(currentLocation.description)
@@ -476,6 +489,17 @@ class Game {
                     println("洞穴中传出奇怪的声音...")
                     Thread.sleep(1000)
                     triggerCombat()
+                    // 检查是否触发Boss战
+                    if (checkAllQuestsCompleted() && !finalBattleTriggered && !finalBossDefeated) {
+                        Thread.sleep(1500)
+                        println("\n突然，洞穴深处传来一阵恐怖的咆哮！")
+                        println("整个洞穴开始震动，岩石从顶部掉落！")
+                        Thread.sleep(2000)
+                        println("\n一个巨大的黑影从洞穴深处浮现...")
+                        println("$FINAL_BOSS_NAME 出现了！")
+                        finalBattleTriggered = true
+                        triggerFinalBossBattle()
+                    }
                 }
 
                 "村庄" -> {
@@ -1042,6 +1066,162 @@ class Game {
             val remainingTime = (player.restCooldown - timeSinceLastRest) / 1000
             println("你还太疲惫，需要等待${remainingTime}秒才能再次休息。")
         }
+    }
+
+    private fun checkAllQuestsCompleted(): Boolean {
+        return player.completedQuests.containsAll(listOf(banditQuestName, "寻找木剑", "收集矿石", "钓鱼"))
+    }
+
+    private fun triggerFinalBossBattle() {
+        println("\n=== 最终决战 ===")
+        println("$FINAL_BOSS_NAME 向你发起了挑战！")
+        println("它的体型巨大，浑身散发着黑暗能量，眼睛如血般鲜红！")
+
+        while (finalBossHealth > 0 && player.health > 0) {
+            // 显示Boss状态
+            val healthPercentage = (finalBossHealth.toDouble() / FINAL_BOSS_MAX_HEALTH * 100).toInt()
+            println("\n$FINAL_BOSS_NAME 生命值: $finalBossHealth/$FINAL_BOSS_MAX_HEALTH ($healthPercentage%) | 阶段: $finalBossPhase/3")
+            println("你的生命值: ${player.health}/${player.maxHealth}")
+
+            // Boss阶段转换
+            when {
+                finalBossHealth < FINAL_BOSS_MAX_HEALTH / 3 && finalBossPhase == 1 -> {
+                    finalBossPhase = 2
+                    println("\n$FINAL_BOSS_NAME 暴怒了！它的攻击变得更加凶猛！")
+                }
+
+                finalBossHealth < FINAL_BOSS_MAX_HEALTH / 10 && finalBossPhase == 2 -> {
+                    finalBossPhase = 3
+                    println("\n$FINAL_BOSS_NAME 进入绝望模式！它开始释放全部黑暗能量！")
+                }
+            }
+
+            // 玩家行动选择
+            println("\n1. 攻击 | 2. 使用物品 | 3. 尝试逃跑")
+            when (readlnOrNull()) {
+                "1" -> attackFinalBoss()
+                "2" -> {
+                    openInventory()
+                    if (player.health <= 0) break
+                }
+
+                "3" -> {
+                    if (attemptEscapeFromBoss()) {
+                        println("你成功逃离了战斗！但$FINAL_BOSS_NAME 仍在洞穴深处...")
+                        return
+                    } else {
+                        println("逃跑失败！$FINAL_BOSS_NAME 挡住了你的去路！")
+                    }
+                }
+
+                else -> println("无效输入，自动选择攻击！")
+            }
+
+            // Boss行动
+            if (finalBossHealth > 0) {
+                bossAttack()
+            }
+        }
+
+        // 战斗结果处理
+        if (finalBossHealth <= 0) {
+            finalBossDefeated = true
+            shouldWarnAboutBoss = false  // 更新状态
+            println("\n=== 胜利 ===")
+            println("经过一场史诗般的战斗，你终于击败了$FINAL_BOSS_NAME！")
+            // 添加奖励
+            player.gold += 10000
+            player.inventory.add("王者之剑")
+            player.inventory.add("皇家护甲")
+            player.inventory.add("公主的戒指")
+
+            println("\n你获得了:")
+            println("10000 金币")
+            println("王者之剑")
+            println("皇家护甲")
+            println("公主的戒指")
+
+            Thread.sleep(2000)
+            println("\n洞穴深处传来微弱的呼救声...")
+            Thread.sleep(1500)
+            println("你发现被囚禁的公主！")
+            Thread.sleep(1000)
+            println("\n公主: 勇敢的冒险者，你救了我！王国将永远铭记你的功绩！")
+            princessRescued = true
+            Thread.sleep(1500)
+            println("\n=== 游戏通关 ===")
+            println("你和公主回到了王国，举行了盛大的婚礼。")
+            println("你们幸福地生活在一起，王国也恢复了和平。")
+            Thread.sleep(2000)
+            println("\n感谢游玩！游戏结束。")
+            exitProcess(0)
+        } else {
+            println("\n你被$FINAL_BOSS_NAME 击败了...")
+            println("黑暗笼罩了王国...")
+            exitProcess(0)
+        }
+    }
+
+    private fun attackFinalBoss() {
+        val baseDamage = calculatePlayerDamage()
+
+        // 根据阶段调整伤害
+        val damageMultiplier = when (finalBossPhase) {
+            1 -> 1.0
+            2 -> 0.8
+            3 -> 0.5
+            else -> 1.0
+        }
+
+        val actualDamage = (baseDamage * damageMultiplier).toInt()
+        finalBossHealth -= actualDamage
+        println("你对$FINAL_BOSS_NAME 造成了 $actualDamage 点伤害！")
+
+        // Boss自动回血
+        if (Random.nextInt(100) < 30) {
+            val healAmount = Random.nextInt(100, 300)
+            finalBossHealth = (finalBossHealth + healAmount).coerceAtMost(FINAL_BOSS_MAX_HEALTH)
+            println("$FINAL_BOSS_NAME 的黑暗能量使它恢复了 $healAmount 点生命值！")
+        }
+    }
+
+    private fun bossAttack() {
+        val attackType = when (Random.nextInt(100)) {
+            in 0..60 -> "普通攻击"
+            in 61..85 -> "吸血攻击"
+            else -> "黑暗冲击波"
+        }
+
+        val damage = when (attackType) {
+            "普通攻击" -> Random.nextInt(50, 100) * finalBossPhase
+            "吸血攻击" -> {
+                val dmg = Random.nextInt(80, 150) * finalBossPhase
+                val heal = dmg / 2
+                finalBossHealth = (finalBossHealth + heal).coerceAtMost(FINAL_BOSS_MAX_HEALTH)
+                println("$FINAL_BOSS_NAME 从你身上吸取了生命值，恢复了 $heal 点生命！")
+                dmg
+            }
+
+            "黑暗冲击波" -> {
+                println("$FINAL_BOSS_NAME 释放了黑暗冲击波！")
+                Random.nextInt(150, 250) * finalBossPhase
+            }
+
+            else -> 0
+        }
+
+        val actualDamage = (damage - player.defenseBonus).coerceAtLeast(10)
+        player.health -= actualDamage
+        println("$FINAL_BOSS_NAME 的$attackType 对你造成了 $actualDamage 点伤害！")
+    }
+
+    private fun attemptEscapeFromBoss(): Boolean {
+        return Random.nextFloat() < 0.2f
+    }
+
+    companion object {
+        private const val FINAL_BOSS_NAME = "暗影魔王卡奥斯"
+        private const val FINAL_BOSS_MAX_HEALTH = 10000
     }
 }
 
