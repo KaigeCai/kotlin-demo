@@ -65,17 +65,26 @@ class Game {
 
     // 商店物品及价格
     private val shopItems = mapOf(
-        "宝剑" to 50, "机枪" to 150, "火箭弹" to 300, "振金铠甲" to 200, "钢铁侠铠甲" to 500, "满血瓶" to 30
+        "宝剑" to 50,
+        "机枪" to 150,
+        "火箭弹" to 300,
+        "振金铠甲" to 200,
+        "钢铁侠铠甲" to 500,
+        "满血瓶" to 100
     )
 
     // 武器攻击力
     private val weaponStats = mapOf(
-        "木剑" to 10, "宝剑" to 50, "机枪" to 88, "火箭弹" to 333
+        "木剑" to 10,
+        "宝剑" to 50,
+        "机枪" to 88,
+        "火箭弹" to 333
     )
 
     // 护甲防御力
     private val armorStats = mapOf(
-        "振金铠甲" to 1000, "钢铁侠铠甲" to 888
+        "振金铠甲" to 1000,
+        "钢铁侠铠甲" to 888
     )
 
     // 更新可用命令
@@ -177,7 +186,7 @@ class Game {
             updateAvailableCommands()
             println("输入命令(${availableCommands.joinToString("、")}): ")
             when (val input = readlnOrNull()?.lowercase(Locale.getDefault())) {
-                "北", "南", "东", "西" -> move(input)
+                "北", "南", "西", "东" -> move(input)
                 "拾取" -> if (availableCommands.contains("拾取")) pickUpItem() else println("当前不能拾取物品")
                 "与村民对话" -> if (availableCommands.contains("与村民对话")) talkToVillager() else println("这里没有村民")
                 "商店" -> if (availableCommands.contains("商店")) openShop() else println("这里没有商店")
