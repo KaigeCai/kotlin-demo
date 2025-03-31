@@ -7,7 +7,7 @@ import kotlin.system.exitProcess
 class Player {
     var name: String = "冒险者"
     var health: Int = 100
-    var maxHealth: Int = 100
+    private var baseMaxHealth: Int = 100
     var gold: Int = 10
     var inventory: MutableList<String> = mutableListOf()
     var activeQuests: MutableList<String> = mutableListOf()
@@ -16,6 +16,7 @@ class Player {
     var equippedArmor: String? = null
     var attackBonus: Int = 0
     var defenseBonus: Int = 0
+    var maxHealth: Int = baseMaxHealth + defenseBonus
 
     fun showStatus() {
         println("玩家: $name | 生命值: $health/$maxHealth | 金币: $gold")
@@ -47,7 +48,6 @@ class Location(val name: String, val description: String) {
     val exits: MutableMap<String, Location> = mutableMapOf()
     val items: MutableList<String> = mutableListOf()
     var hasVillager: Boolean = false
-    var hasShop: Boolean = false
 }
 
 // 游戏类
@@ -90,18 +90,14 @@ class Game {
     // 更新可用命令
     private fun updateAvailableCommands() {
         availableCommands.clear()
-        availableCommands.addAll(listOf("方向", "打开背包", "装备", "保存", "退出"))
+        availableCommands.addAll(listOf("方向", "背包", "商店", "装备", "保存", "退出"))
 
         if (currentLocation.items.isNotEmpty()) {
             availableCommands.add("拾取")
         }
 
         if (currentLocation.hasVillager) {
-            availableCommands.add("与村民对话")
-        }
-
-        if (currentLocation.hasShop) {
-            availableCommands.add("商店")
+            availableCommands.add("对话")
         }
 
         if (currentLocation.name == "湖泊" && player.inventory.contains("鱼竿")) {
@@ -112,7 +108,6 @@ class Game {
     init {
         val village = Location("村庄", "一个宁静的小村庄，村民们过着平静的生活。").apply {
             hasVillager = true
-            hasShop = true
             items.add("苹果")
             items.add("面包")
         }
@@ -188,11 +183,11 @@ class Game {
             when (val input = readlnOrNull()?.lowercase(Locale.getDefault())) {
                 "北", "南", "西", "东" -> move(input)
                 "拾取" -> if (availableCommands.contains("拾取")) pickUpItem() else println("当前不能拾取物品")
-                "与村民对话" -> if (availableCommands.contains("与村民对话")) talkToVillager() else println("这里没有村民")
-                "商店" -> if (availableCommands.contains("商店")) openShop() else println("这里没有商店")
+                "对话" -> if (availableCommands.contains("对话")) talkToVillager() else println("这里没有村民")
+                "商店" -> openShop()
                 "装备" -> manageEquipment()
                 "钓鱼" -> if (availableCommands.contains("钓鱼")) startFishing() else println("这里不能钓鱼或你没有鱼竿")
-                "打开背包" -> openInventory()
+                "背包" -> openInventory()
                 "保存" -> saveGame()
                 "退出" -> {
                     println("感谢游玩！")
@@ -231,11 +226,28 @@ class Game {
                     player.gold -= price
                     player.inventory.add(input)
                     println("你购买了$input！")
+                    // 处理装备购买后自动装备的情况
+                    when {
+                        weaponStats.containsKey(input) -> {
+                            player.equippedWeapon = input
+                            player.attackBonus = weaponStats[input]!!
+                            println("你自动装备了$input！攻击力+${player.attackBonus}")
+                        }
 
-                    if (input == "满血瓶") {
-                        player.health = player.maxHealth
-                        println("你的生命值已完全恢复！")
-                        player.inventory.remove("满血瓶")
+                        armorStats.containsKey(input) -> {
+                            player.equippedArmor = input
+                            player.defenseBonus = armorStats[input]!!
+                            println("你自动装备了$input！防御力+${player.defenseBonus}")
+                            // 更新生命值
+                            player.maxHealth = 100 + player.defenseBonus
+                            println("你的最大生命值现在是${player.maxHealth}")
+                        }
+
+                        input == "满血瓶" -> {
+                            player.health = player.maxHealth
+                            println("你的生命值已完全恢复！")
+                            player.inventory.remove("满血瓶")
+                        }
                     }
                 } else {
                     println("金币不足！")
@@ -307,6 +319,7 @@ class Game {
                 val selectedArmor = armors[choice - 1]
                 player.equippedArmor = selectedArmor
                 player.defenseBonus = armorStats[selectedArmor]!!
+                player.maxHealth = 100 + player.defenseBonus
                 println("你装备了$selectedArmor！防御力+${player.defenseBonus}")
             }
 
@@ -493,7 +506,7 @@ class Game {
         }
     }
 
-    // 与村民对话
+    // 对话
     private fun talkToVillager() {
         if (currentLocation.hasVillager) {
             when (currentLocation.name) {
@@ -559,6 +572,19 @@ class Game {
 
                         player.activeQuests.contains("钓鱼") -> {
                             println("渔夫说：用鱼竿在湖边钓鱼就能抓到鱼。")
+                        }
+
+                        player.completedQuests.contains("钓鱼") -> {
+                            println("渔夫说：想再帮我钓鱼吗？")
+                            println("1. 接受任务 | 2. 拒绝")
+                            val choice = readlnOrNull()
+                            if (choice == "1") {
+                                player.activeQuests.add("钓鱼")
+                                if (!player.inventory.contains("鱼竿")) {
+                                    currentLocation.items.add("鱼竿")
+                                    println("渔夫说：我把鱼竿放在地上了。")
+                                }
+                            }
                         }
                     }
                 }
@@ -784,7 +810,7 @@ class Game {
         }
     }
 
-    // 打开背包
+    // 背包
     private fun openInventory() {
         if (player.inventory.isEmpty()) {
             println("你的背包是空的！")
