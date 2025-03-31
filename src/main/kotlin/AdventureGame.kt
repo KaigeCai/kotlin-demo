@@ -3,6 +3,11 @@ import java.util.*
 import kotlin.random.Random
 import kotlin.system.exitProcess
 
+// 添加任务常量
+private const val banditQuestName = "剿灭强盗"
+private const val banditQuestRequirement = 5 // 需要击败的强盗数量
+private var banditsDefeated = 0 // 记录已击败强盗数量
+
 // 玩家类
 class Player {
     var name: String = "冒险者"
@@ -22,6 +27,11 @@ class Player {
         println("玩家: $name | 生命值: $health/$maxHealth | 金币: $gold")
         println("攻击力: ${5 + attackBonus} | 防御力: $defenseBonus")
         println("装备: 武器-${equippedWeapon ?: "无"} | 护甲-${equippedArmor ?: "无"}")
+
+        // 显示剿灭强盗任务进度
+        if (activeQuests.contains(banditQuestName)) {
+            println("剿灭强盗进度: $banditQuestName ($banditsDefeated/$banditQuestRequirement)")
+        }
 
         // 修改背包显示逻辑
         if (inventory.isEmpty()) {
@@ -65,26 +75,17 @@ class Game {
 
     // 商店物品及价格
     private val shopItems = mapOf(
-        "宝剑" to 50,
-        "机枪" to 150,
-        "火箭弹" to 300,
-        "振金铠甲" to 200,
-        "钢铁侠铠甲" to 500,
-        "满血瓶" to 100
+        "宝剑" to 50, "机枪" to 150, "火箭弹" to 300, "振金铠甲" to 200, "钢铁侠铠甲" to 500, "满血瓶" to 100
     )
 
     // 武器攻击力
     private val weaponStats = mapOf(
-        "木剑" to 10,
-        "宝剑" to 50,
-        "机枪" to 88,
-        "火箭弹" to 333
+        "木剑" to 10, "宝剑" to 50, "机枪" to 88, "火箭弹" to 333, "短剑" to 30, "手枪" to 100
     )
 
     // 护甲防御力
     private val armorStats = mapOf(
-        "振金铠甲" to 1000,
-        "钢铁侠铠甲" to 888
+        "振金铠甲" to 1000, "钢铁侠铠甲" to 888, "皮甲" to 200
     )
 
     // 物品售价
@@ -97,7 +98,14 @@ class Game {
         "苹果" to 10,
         "面包" to 15,
         "草药" to 25,
-        "火把" to 30
+        "火把" to 30,
+        "蝙蝠翅膀" to 400,
+        "蝙蝠牙齿" to 600,
+        "短剑" to 350,
+        "皮甲" to 500,
+        "强盗徽章" to 200,
+        "烈酒" to 80,
+        "手枪" to 300
     )
 
     // 更新可用命令
@@ -475,7 +483,7 @@ class Game {
     private fun triggerEnemy(location: String) {
         val enemies = when (location) {
             "森林" -> listOf("强盗", "野狼", "毒蜘蛛")
-            "洞穴" -> listOf("毒蜘蛛")
+            "洞穴" -> listOf("毒蜘蛛", "蝙蝠")
             else -> emptyList()
         }
 
@@ -491,7 +499,7 @@ class Game {
         var enemyHealth = when (enemy) {
             "野狼" -> 20
             "毒蜘蛛" -> 15
-            "强盗" -> 30
+            "强盗" -> 300
             else -> 20
         }
 
@@ -524,6 +532,12 @@ class Game {
             val reward = calculateReward(enemy)
             println("你击败了$enemy！获得 $reward 金币。")
             player.gold += reward
+
+            // 如果是强盗且任务进行中，增加计数
+            if (enemy == "强盗" && player.activeQuests.contains(banditQuestName)) {
+                banditsDefeated++
+                println("(任务进度: $banditsDefeated/$banditQuestRequirement)")
+            }
         }
 
         if (player.health <= 0) {
@@ -547,6 +561,7 @@ class Game {
             "野狼" -> Random.nextInt(5, 10)
             "毒蜘蛛" -> Random.nextInt(8, 13)
             "强盗" -> Random.nextInt(10, 15)
+            "蝙蝠" -> Random.nextInt(20, 50)
             else -> Random.nextInt(5, 10)
         }
     }
@@ -557,6 +572,7 @@ class Game {
             "野狼" -> 5
             "毒蜘蛛" -> 8
             "强盗" -> 15
+            "蝙蝠" -> 12
             else -> 5
         }
     }
@@ -600,6 +616,41 @@ class Game {
         if (currentLocation.hasVillager) {
             when (currentLocation.name) {
                 "村庄" -> {
+                    if (!player.completedQuests.contains(
+                            banditQuestName
+                        ) && !player.activeQuests.contains(
+                            banditQuestName
+                        )
+                    ) {
+                        println("\n镇长忧心忡忡地说：最近强盗猖獗，你能帮忙剿灭${banditQuestRequirement}个强盗吗？")
+                        println("1. 接受任务 | 2. 拒绝")
+
+                        when (readlnOrNull()) {
+                            "1" -> {
+                                player.activeQuests.add(banditQuestName)
+                                banditsDefeated = 0
+                                println("你接受了任务：$banditQuestName")
+                            }
+
+                            else -> println("镇长叹了口气：希望有人能解决这个问题...")
+                        }
+                    }
+
+                    // 添加任务完成检查
+                    if (player.activeQuests.contains(banditQuestName)) {
+                        if (banditsDefeated >= banditQuestRequirement) {
+                            val rewardGold = 3000
+                            println("\n镇长激动地说：你剿灭了${banditsDefeated}个强盗！这是你的奖励。")
+                            println("获得 $rewardGold 金币！")
+                            player.gold += rewardGold
+                            player.activeQuests.remove(banditQuestName)
+                            player.completedQuests.add(banditQuestName)
+                            banditsDefeated = 0
+                        } else {
+                            println("\n镇长：还需要剿灭${banditQuestRequirement - banditsDefeated}个强盗！")
+                        }
+                    }
+
                     if (player.activeQuests.contains("寻找木剑") && player.inventory.contains("木剑")) {
                         println("村民说：你找到了木剑！太感谢了！这是你的奖励。")
                         player.inventory.remove("木剑")
@@ -772,14 +823,15 @@ class Game {
     // 随机事件
     private fun randomEvent() {
         if (!currentLocation.hasVillager) {
-            val enemies = listOf("野狼", "毒蜘蛛", "强盗")
+            val enemies = listOf("野狼", "毒蜘蛛", "强盗", "蝙蝠")
             val enemy = enemies.random()
             println("一只${enemy}突然跳了出来！")
             var enemyHealth = when (enemy) {
                 "野狼" -> 20
                 "毒蜘蛛" -> 15
                 "强盗" -> 30
-                else -> 20
+                "蝙蝠" -> 80
+                else -> 0
             }
 
             while (enemyHealth > 0 && player.health > 0) {
@@ -806,13 +858,14 @@ class Game {
                 player.gold += reward
 
                 val loot = when (enemy) {
-                    "野狼" -> "狼皮"
-                    "毒蜘蛛" -> "蜘蛛毒液"
-                    "强盗" -> "钱袋"
-                    else -> "未知物品"
+                    "野狼" -> listOf("狼皮")
+                    "毒蜘蛛" -> listOf("蜘蛛毒液")
+                    "强盗" -> listOf("钱袋", "手枪", "短剑", "皮甲", "强盗徽章", "烈酒")
+                    "蝙蝠" -> listOf("蝙蝠翅膀", "蝙蝠牙齿")
+                    else -> listOf("未知物品")
                 }
                 println("${enemy}掉落了: $loot")
-                player.inventory.add(loot)
+                player.inventory.addAll(loot)
             }
             if (player.health <= 0) {
                 println("你被击败了！游戏结束。")
@@ -822,16 +875,16 @@ class Game {
     }
 
     private fun damage(enemyHealth: Int, enemy: String): Int {
-        var enemyHealth1 = enemyHealth
+        var enemyHP = enemyHealth
         val damage = calculatePlayerDamage()
-        enemyHealth1 -= damage
+        enemyHP -= damage
         println("你对${enemy}造成了 $damage 点伤害！")
-        if (enemyHealth1 > 0) {
+        if (enemyHP > 0) {
             val enemyDamage = (calculateEnemyDamage(enemy) - player.defenseBonus).coerceAtLeast(1)
             player.health -= enemyDamage
             println("${enemy}对你造成了 $enemyDamage 点伤害！")
         }
-        return enemyHealth1
+        return enemyHP
     }
 
     // 保存游戏
@@ -848,6 +901,7 @@ class Game {
                 appendLine("当前位置:${currentLocation.name}")
                 appendLine("装备武器:${player.equippedWeapon ?: "无"}")
                 appendLine("装备护甲:${player.equippedArmor ?: "无"}")
+                appendLine("剿灭强盗进度:$banditsDefeated")
             }
             File("SaveGame.txt").writeText(saveData)
             println("游戏已成功保存！")
@@ -889,6 +943,7 @@ class Game {
 
                 player.attackBonus = player.equippedWeapon?.let { weaponStats[it] ?: 0 } ?: 0
                 player.defenseBonus = player.equippedArmor?.let { armorStats[it] ?: 0 } ?: 0
+                banditsDefeated = saveData["剿灭强盗进度"]?.toIntOrNull() ?: 0
 
                 println("游戏已加载！")
             } catch (e: Exception) {
@@ -923,13 +978,9 @@ class Game {
 
             else -> {
                 val itemList = groupedItems.keys.toList()
-                val selectedIndices = input.split(" ").asSequence()
-                    .mapNotNull { it.toIntOrNull() }
-                    .filter { it in 1..itemList.size }
-                    .map { it - 1 }
-                    .distinct()
-                    .sortedDescending()
-                    .toList()
+                val selectedIndices =
+                    input.split(" ").asSequence().mapNotNull { it.toIntOrNull() }.filter { it in 1..itemList.size }
+                        .map { it - 1 }.distinct().sortedDescending().toList()
 
                 if (selectedIndices.isEmpty()) {
                     println("无效选择！")
@@ -972,6 +1023,11 @@ class Game {
                     healthRestored += 40
                     curedPoison = true
                     itemsToRemove.add(item)
+                }
+
+                "烈酒" -> {
+                    healthRestored += 50
+                    player.inventory.remove(item)
                 }
             }
         }
