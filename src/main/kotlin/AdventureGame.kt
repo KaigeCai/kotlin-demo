@@ -652,124 +652,149 @@ class Game {
 
     // 对话
     private fun talkToVillager() {
-        if (currentLocation.hasVillager) {
-            when (currentLocation.name) {
-                "村庄" -> {
-                    if (!player.completedQuests.contains(
-                            banditQuestName
-                        ) && !player.activeQuests.contains(
-                            banditQuestName
-                        )
-                    ) {
-                        println("\n镇长忧心忡忡地说：最近强盗猖獗，你能帮忙剿灭${banditQuestRequirement}个强盗吗？")
-                        println("1. 接受任务 | 2. 拒绝")
+        if (!currentLocation.hasVillager) {
+            println("这里没有村民可以对话。")
+            return
+        }
 
-                        when (readlnOrNull()) {
-                            "1" -> {
-                                player.activeQuests.add(banditQuestName)
-                                banditsDefeated = 0
-                                println("你接受了任务：$banditQuestName")
-                            }
+        when (currentLocation.name) {
+            "村庄" -> handleVillageDialogue()
+            "湖泊" -> handleLakeDialogue()
+        }
+    }
 
-                            else -> println("镇长叹了口气：希望有人能解决这个问题...")
-                        }
+    private fun handleVillageDialogue() {
+        when {
+            !player.completedQuests.contains(banditQuestName) && !player.activeQuests.contains(banditQuestName) -> {
+                println("\n镇长忧心忡忡地说：最近强盗猖獗，你能帮忙剿灭${banditQuestRequirement}个强盗吗？")
+                println("1. 接受任务 | 2. 拒绝")
+
+                when (readlnOrNull()) {
+                    "1" -> {
+                        player.activeQuests.add(banditQuestName)
+                        banditsDefeated = 0
+                        println("你接受了任务：$banditQuestName")
                     }
 
-                    // 添加任务完成检查
-                    if (player.activeQuests.contains(banditQuestName)) {
-                        if (banditsDefeated >= banditQuestRequirement) {
-                            val rewardGold = 3000
-                            println("\n镇长激动地说：你剿灭了${banditsDefeated}个强盗！这是你的奖励。")
-                            println("获得 $rewardGold 金币！")
-                            player.gold += rewardGold
-                            player.activeQuests.remove(banditQuestName)
-                            player.completedQuests.add(banditQuestName)
-                            banditsDefeated = 0
-                        } else {
-                            println("\n镇长：还需要剿灭${banditQuestRequirement - banditsDefeated}个强盗！")
-                        }
-                    }
-
-                    if (player.activeQuests.contains("寻找木剑") && player.inventory.contains("木剑")) {
-                        println("村民说：你找到了木剑！太感谢了！这是你的奖励。")
-                        player.inventory.remove("木剑")
-                        player.gold += 15
-                        player.activeQuests.remove("寻找木剑")
-                        player.completedQuests.add("寻找木剑")
-                    } else if (!player.completedQuests.contains("寻找木剑") && !player.activeQuests.contains("寻找木剑")) {
-                        println("村民说：欢迎你，${player.name}！我需要一柄木剑，你能帮我从森林里找来吗？")
-                        println("1. 接受任务 | 2. 拒绝")
-                        val choice = readlnOrNull()
-                        if (choice == "1") {
-                            player.activeQuests.add("寻找木剑")
-                            println("你接受了任务：寻找木剑")
-                        } else {
-                            println("村民说：好吧，也许下次吧。")
-                        }
-                    } else if (player.activeQuests.contains("寻找木剑")) {
-                        println("村民说：你找到木剑了吗？它在森林里。")
-                    }
-
-                    if (player.completedQuests.contains("寻找木剑") && !player.completedQuests.contains("收集矿石")) {
-                        println("铁匠说：我看到你帮助了村民，能帮我从洞穴收集一些矿石吗？")
-                        println("1. 接受任务 | 2. 拒绝")
-                        val choice = readlnOrNull()
-                        if (choice == "1") {
-                            player.activeQuests.add("收集矿石")
-                            println("你接受了任务：收集矿石")
-                        }
-                    } else if (player.activeQuests.contains("收集矿石") && player.inventory.contains("矿石")) {
-                        println("铁匠说：太好了，你带来了矿石！这是你的奖励。")
-                        player.inventory.remove("矿石")
-                        player.gold += 25
-                        player.activeQuests.remove("收集矿石")
-                        player.completedQuests.add("收集矿石")
-                    }
-                }
-
-                "湖泊" -> {
-                    when {
-                        !player.completedQuests.contains("钓鱼") && !player.activeQuests.contains("钓鱼") -> {
-                            println("渔夫说：你好啊，${player.name}！能帮我钓几条鱼吗？我可以借你鱼竿。")
-                            println("1. 接受任务 | 2. 拒绝")
-                            val choice = readlnOrNull()
-                            if (choice == "1") {
-                                player.activeQuests.add("钓鱼")
-                                currentLocation.items.add("鱼竿")
-                                println("你接受了任务：钓鱼")
-                                println("渔夫说：太好了！我把鱼竿放在地上了，拾取它就可以开始钓鱼。")
-                            }
-                        }
-
-                        player.activeQuests.contains("钓鱼") && player.inventory.contains("鱼") -> {
-                            println("渔夫说：哇，你钓到鱼了！太棒了！这是你的奖励。")
-                            player.inventory.remove("鱼")
-                            player.gold += 20
-                            player.activeQuests.remove("钓鱼")
-                            player.completedQuests.add("钓鱼")
-                        }
-
-                        player.activeQuests.contains("钓鱼") -> {
-                            println("渔夫说：用鱼竿在湖边钓鱼就能抓到鱼。")
-                        }
-
-                        player.completedQuests.contains("钓鱼") -> {
-                            println("渔夫说：想再帮我钓鱼吗？")
-                            println("1. 接受任务 | 2. 拒绝")
-                            val choice = readlnOrNull()
-                            if (choice == "1") {
-                                player.activeQuests.add("钓鱼")
-                                if (!player.inventory.contains("鱼竿")) {
-                                    currentLocation.items.add("鱼竿")
-                                    println("渔夫说：我把鱼竿放在地上了。")
-                                }
-                            }
-                        }
-                    }
+                    else -> println("镇长叹了口气：希望有人能解决这个问题...")
                 }
             }
-        } else {
-            println("这里没有村民可以对话。")
+
+            player.activeQuests.contains(banditQuestName) -> {
+                if (banditsDefeated >= banditQuestRequirement) {
+                    val rewardGold = 3000
+                    println("\n镇长激动地说：你剿灭了${banditsDefeated}个强盗！这是你的奖励。")
+                    println("获得 $rewardGold 金币！")
+                    player.gold += rewardGold
+                    player.activeQuests.remove(banditQuestName)
+                    player.completedQuests.add(banditQuestName)
+                    banditsDefeated = 0
+                } else {
+                    println("\n镇长：还需要剿灭${banditQuestRequirement - banditsDefeated}个强盗！")
+                }
+            }
+        }
+
+        when {
+            player.activeQuests.contains("寻找木剑") && player.inventory.contains("木剑") -> {
+                println("村民说：你找到了木剑！太感谢了！这是你的奖励。")
+                player.inventory.remove("木剑")
+                player.gold += 15
+                player.activeQuests.remove("寻找木剑")
+                player.completedQuests.add("寻找木剑")
+            }
+
+            !player.completedQuests.contains("寻找木剑") && !player.activeQuests.contains("寻找木剑") -> {
+                println("村民说：欢迎你，${player.name}！我需要一柄木剑，你能帮我从森林里找来吗？")
+                println("1. 接受任务 | 2. 拒绝")
+                when (readlnOrNull()) {
+                    "1" -> {
+                        player.activeQuests.add("寻找木剑")
+                        println("你接受了任务：寻找木剑")
+                    }
+
+                    else -> println("村民说：好吧，也许下次吧。")
+                }
+            }
+
+            player.activeQuests.contains("寻找木剑") -> {
+                println("村民说：你找到木剑了吗？它在森林里。")
+            }
+        }
+
+        when {
+            player.completedQuests.contains("寻找木剑") && !player.completedQuests.contains("收集矿石") &&
+                    !player.activeQuests.contains("收集矿石") -> {
+                println("\n铁匠说：我看到你帮助了村民，能帮我从洞穴收集一些矿石吗？")
+                println("1. 接受任务 | 2. 拒绝")
+                when (readlnOrNull()) {
+                    "1" -> {
+                        player.activeQuests.add("收集矿石")
+                        println("你接受了任务：收集矿石")
+                    }
+
+                    else -> println("铁匠说：好吧，也许下次吧。")
+                }
+            }
+
+            player.activeQuests.contains("收集矿石") && player.inventory.contains("矿石") -> {
+                println("\n铁匠说：太好了，你带来了矿石！这是你的奖励。")
+                player.inventory.remove("矿石")
+                player.gold += 25
+                player.activeQuests.remove("收集矿石")
+                player.completedQuests.add("收集矿石")
+            }
+
+            player.activeQuests.contains("收集矿石") -> {
+                println("\n铁匠说：你找到矿石了吗？它们在洞穴里。")
+            }
+        }
+    }
+
+    private fun handleLakeDialogue() {
+        when {
+            !player.completedQuests.contains("钓鱼") && !player.activeQuests.contains("钓鱼") -> {
+                println("渔夫说：你好啊，${player.name}！能帮我钓几条鱼吗？我可以借你鱼竿。")
+                println("1. 接受任务 | 2. 拒绝")
+                when (readlnOrNull()) {
+                    "1" -> {
+                        player.activeQuests.add("钓鱼")
+                        currentLocation.items.add("鱼竿")
+                        println("你接受了任务：钓鱼")
+                        println("渔夫说：太好了！我把鱼竿放在地上了，拾取它就可以开始钓鱼。")
+                    }
+
+                    else -> Unit
+                }
+            }
+
+            player.activeQuests.contains("钓鱼") && player.inventory.contains("鱼") -> {
+                println("渔夫说：哇，你钓到鱼了！太棒了！这是你的奖励。")
+                player.inventory.remove("鱼")
+                player.gold += 20
+                player.activeQuests.remove("钓鱼")
+                player.completedQuests.add("钓鱼")
+            }
+
+            player.activeQuests.contains("钓鱼") -> {
+                println("渔夫说：用鱼竿在湖边钓鱼就能抓到鱼。")
+            }
+
+            player.completedQuests.contains("钓鱼") -> {
+                println("渔夫说：想再帮我钓鱼吗？")
+                println("1. 接受任务 | 2. 拒绝")
+                when (readlnOrNull()) {
+                    "1" -> {
+                        player.activeQuests.add("钓鱼")
+                        if (!player.inventory.contains("鱼竿")) {
+                            currentLocation.items.add("鱼竿")
+                            println("渔夫说：我把鱼竿放在地上了。")
+                        }
+                    }
+
+                    else -> Unit
+                }
+            }
         }
     }
 
