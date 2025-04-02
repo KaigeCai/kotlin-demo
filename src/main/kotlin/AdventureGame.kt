@@ -14,7 +14,7 @@ class Player {
     var name: String = "冒险者"
     var health: Int = 100
     private var baseMaxHealth: Int = 100
-    var gold: Int = 10
+    var gold: Int = 10000
     var inventory: MutableList<String> = mutableListOf()
     var activeQuests: MutableList<String> = mutableListOf()
     var completedQuests: MutableList<String> = mutableListOf()
@@ -260,55 +260,79 @@ class Game {
         }
     }
 
+    // 购买菜单
     private fun showBuyMenu() {
         println("\n=== 购买 ===")
         println("你的金币: ${player.gold}")
         shopItems.forEach { (item, price) ->
             println("$item - $price 金币")
         }
-        println("输入要购买的物品名称，或输入0返回:")
+        println("输入要购买的物品名称(用空格分隔多个物品)，或输入0返回:")
 
         val input = readlnOrNull()?.trim()
         when {
             input == null || input == "0" -> return
-            shopItems.containsKey(input) -> {
-                val price = shopItems[input]!!
-                if (player.gold >= price) {
-                    player.gold -= price
-                    player.inventory.add(input)
-                    println("你购买了$input！")
-                    // 处理装备购买后自动装备的情况
-                    when {
-                        weaponStats.containsKey(input) -> {
-                            player.equippedWeapon = input
-                            player.attackBonus = weaponStats[input]!!
-                            println("你自动装备了$input！攻击力+${player.attackBonus}")
-                        }
+            else -> {
+                val itemsToBuy = input.split(" ").filter { it.isNotBlank() }
+                if (itemsToBuy.isEmpty()) {
+                    println("没有输入有效物品！")
+                    return
+                }
 
-                        armorStats.containsKey(input) -> {
-                            player.equippedArmor = input
-                            player.defenseBonus = armorStats[input]!!
-                            println("你自动装备了$input！防御力+${player.defenseBonus}")
-                            // 更新生命值
-                            player.maxHealth = 100 + player.defenseBonus
-                            println("你的最大生命值现在是${player.maxHealth}")
-                        }
+                // 检查所有物品是否在商店中
+                val invalidItems = itemsToBuy.filterNot { shopItems.containsKey(it) }
+                if (invalidItems.isNotEmpty()) {
+                    println("以下物品不在商店中: ${invalidItems.joinToString(", ")}")
+                    return
+                }
 
-                        input == "满血瓶" -> {
-                            player.health = player.maxHealth
-                            println("你的生命值已完全恢复！")
-                            player.inventory.remove("满血瓶")
+                // 计算总价
+                val totalCost = itemsToBuy.sumOf { shopItems[it] ?: 0 }
+                if (player.gold < totalCost) {
+                    println("金币不足！需要 $totalCost 金币，但你只有 ${player.gold} 金币。")
+                    return
+                }
+
+                // 确认购买
+                println("确定花费 $totalCost 金币购买 ${itemsToBuy.joinToString(", ")} 吗？(1. 是 | 2. 否)")
+                when (readlnOrNull()?.toIntOrNull()) {
+                    1 -> {
+                        player.gold -= totalCost
+                        itemsToBuy.forEach { item ->
+                            player.inventory.add(item)
+                            // 处理装备购买后自动装备的情况
+                            when {
+                                weaponStats.containsKey(item) -> {
+                                    player.equippedWeapon = item
+                                    player.attackBonus = weaponStats[item]!!
+                                    println("你自动装备了$item！攻击力+${player.attackBonus}")
+                                }
+
+                                armorStats.containsKey(item) -> {
+                                    player.equippedArmor = item
+                                    player.defenseBonus = armorStats[item]!!
+                                    player.maxHealth = 100 + player.defenseBonus
+                                    println("你自动装备了$item！防御力+${player.defenseBonus}")
+                                    println("你的最大生命值现在是${player.maxHealth}")
+                                }
+
+                                item == "满血瓶" -> {
+                                    player.health = player.maxHealth
+                                    println("你的生命值已完全恢复！")
+                                    player.inventory.remove("满血瓶")
+                                }
+                            }
                         }
+                        println("购买成功！获得: ${itemsToBuy.joinToString(", ")}")
                     }
-                } else {
-                    println("金币不足！")
+
+                    else -> println("取消购买。")
                 }
             }
-
-            else -> println("商店没有这个物品！")
         }
     }
 
+    // 出售菜单
     private fun showSellMenu() {
         if (player.inventory.isEmpty()) {
             println("你的背包是空的，没有物品可以出售！")
