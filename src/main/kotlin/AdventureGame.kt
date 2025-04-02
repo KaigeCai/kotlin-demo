@@ -61,6 +61,18 @@ class Player {
             println("已完成的任务: ${completedQuests.distinct().joinToString(", ")}")
         }
     }
+
+    fun addActiveQuest(questName: String) {
+        if (!activeQuests.contains(questName)) {
+            activeQuests.add(questName)
+        }
+    }
+
+    fun addCompletedQuest(questName: String) {
+        if (!completedQuests.contains(questName)) {
+            completedQuests.add(questName)
+        }
+    }
 }
 
 // 地点类
@@ -514,7 +526,7 @@ class Game {
                     Thread.sleep(1000)
                     triggerCombat()
                     // 检查是否触发Boss战
-                    if (checkAllQuestsCompleted() && !finalBattleTriggered && !finalBossDefeated) {
+                    if (checkAllQuestsCompleted() && !finalBossDefeated) {
                         Thread.sleep(1500)
                         println("\n突然，洞穴深处传来一阵恐怖的咆哮！")
                         println("整个洞穴开始震动，岩石从顶部掉落！")
@@ -695,7 +707,7 @@ class Game {
 
                 when (readlnOrNull()) {
                     "1" -> {
-                        player.activeQuests.add(banditQuestName)
+                        player.addActiveQuest(banditQuestName)
                         banditsDefeated = 0
                         println("你接受了任务：$banditQuestName")
                     }
@@ -711,7 +723,7 @@ class Game {
                     println("获得 $rewardGold 金币！")
                     player.gold += rewardGold
                     player.activeQuests.remove(banditQuestName)
-                    player.completedQuests.add(banditQuestName)
+                    player.addCompletedQuest(banditQuestName)
                     banditsDefeated = 0
                 } else {
                     println("\n镇长：还需要剿灭${banditQuestRequirement - banditsDefeated}个强盗！")
@@ -725,7 +737,7 @@ class Game {
                 player.inventory.remove("木剑")
                 player.gold += 15
                 player.activeQuests.remove("寻找木剑")
-                player.completedQuests.add("寻找木剑")
+                player.addCompletedQuest("寻找木剑")
             }
 
             !player.completedQuests.contains("寻找木剑") && !player.activeQuests.contains("寻找木剑") -> {
@@ -733,7 +745,7 @@ class Game {
                 println("1. 接受任务 | 2. 拒绝")
                 when (readlnOrNull()) {
                     "1" -> {
-                        player.activeQuests.add("寻找木剑")
+                        player.addActiveQuest("寻找木剑")
                         println("你接受了任务：寻找木剑")
                     }
 
@@ -747,13 +759,14 @@ class Game {
         }
 
         when {
-            player.completedQuests.contains("寻找木剑") && !player.completedQuests.contains("收集矿石") &&
-                    !player.activeQuests.contains("收集矿石") -> {
+            player.completedQuests.contains("寻找木剑") && !player.completedQuests.contains("收集矿石") && !player.activeQuests.contains(
+                "收集矿石"
+            ) -> {
                 println("\n铁匠说：我看到你帮助了村民，能帮我从洞穴收集一些矿石吗？")
                 println("1. 接受任务 | 2. 拒绝")
                 when (readlnOrNull()) {
                     "1" -> {
-                        player.activeQuests.add("收集矿石")
+                        player.addActiveQuest("收集矿石")
                         println("你接受了任务：收集矿石")
                     }
 
@@ -766,7 +779,7 @@ class Game {
                 player.inventory.remove("矿石")
                 player.gold += 25
                 player.activeQuests.remove("收集矿石")
-                player.completedQuests.add("收集矿石")
+                player.addCompletedQuest("收集矿石")
             }
 
             player.activeQuests.contains("收集矿石") -> {
@@ -782,7 +795,7 @@ class Game {
                 println("1. 接受任务 | 2. 拒绝")
                 when (readlnOrNull()) {
                     "1" -> {
-                        player.activeQuests.add("钓鱼")
+                        player.addActiveQuest("钓鱼")
                         currentLocation.items.add("鱼竿")
                         println("你接受了任务：钓鱼")
                         println("渔夫说：太好了！我把鱼竿放在地上了，拾取它就可以开始钓鱼。")
@@ -797,7 +810,7 @@ class Game {
                 player.inventory.remove("鱼")
                 player.gold += 20
                 player.activeQuests.remove("钓鱼")
-                player.completedQuests.add("钓鱼")
+                player.addCompletedQuest("钓鱼")
             }
 
             player.activeQuests.contains("钓鱼") -> {
@@ -809,7 +822,7 @@ class Game {
                 println("1. 接受任务 | 2. 拒绝")
                 when (readlnOrNull()) {
                     "1" -> {
-                        player.activeQuests.add("钓鱼")
+                        player.addActiveQuest("钓鱼")
                         if (!player.inventory.contains("鱼竿")) {
                             currentLocation.items.add("鱼竿")
                             println("渔夫说：我把鱼竿放在地上了。")
@@ -930,8 +943,8 @@ class Game {
                 appendLine("最大生命值:${player.maxHealth}")
                 appendLine("金币:${player.gold}")
                 appendLine("背包:${player.inventory.joinToString(",")}")
-                appendLine("进行中的任务:${player.activeQuests.joinToString(",")}")
-                appendLine("已完成的任务:${player.completedQuests.joinToString(",")}")
+                appendLine("进行中的任务:${player.activeQuests.distinct().joinToString(",")}")
+                appendLine("已完成的任务:${player.completedQuests.distinct().joinToString(",")}")
                 appendLine("当前位置:${currentLocation.name}")
                 appendLine("装备武器:${player.equippedWeapon ?: "无"}")
                 appendLine("装备护甲:${player.equippedArmor ?: "无"}")
@@ -1023,11 +1036,12 @@ class Game {
 
                 val selectedItems = selectedIndices.map { itemList[it] }
                 println("你选择了: ${selectedItems.joinToString(", ")}")
-                println("1. 食用 | 2. 丢弃 | 0. 取消")
+                println("1. 食用 | 2. 装备 | 3. 丢弃 | 0. 取消")
 
                 when (readlnOrNull()?.toIntOrNull()) {
-                    1 -> useItems(selectedItems)
-                    2 -> discardItems(selectedItems)
+                    1 -> edibleItems(selectedItems)
+                    2 -> equipItems(selectedItems)
+                    3 -> discardItems(selectedItems)
                     0 -> println("取消操作。")
                     else -> println("无效选择！")
                 }
@@ -1035,8 +1049,31 @@ class Game {
         }
     }
 
-    // 批量使用物品
-    private fun useItems(selectedItems: List<String>) {
+    // 批量装备物品
+    private fun equipItems(selectedItems: List<String>) {
+        selectedItems.forEach { item ->
+            when {
+                weaponStats.containsKey(item) -> {
+                    player.equippedWeapon = item
+                    player.attackBonus = weaponStats[item]!!
+                    println("你装备了$item！攻击力+${player.attackBonus}")
+                }
+
+                armorStats.containsKey(item) -> {
+                    player.equippedArmor = item
+                    player.defenseBonus = armorStats[item]!!
+                    player.maxHealth = 100 + player.defenseBonus
+                    println("你装备了$item！防御力+${player.defenseBonus}")
+                    println("你的最大生命值现在是${player.maxHealth}")
+                }
+
+                else -> println("$item 不是可装备的物品")
+            }
+        }
+    }
+
+    // 批量食用物品
+    private fun edibleItems(selectedItems: List<String>) {
         var healthRestored = 0
         val itemsToRemove = mutableListOf<String>()
         var curedPoison = false
@@ -1157,6 +1194,7 @@ class Game {
                 "3" -> {
                     if (attemptEscapeFromBoss()) {
                         println("你成功逃离了战斗！但$FINAL_BOSS_NAME 仍在洞穴深处...")
+                        finalBattleTriggered = false
                         return
                     } else {
                         println("逃跑失败！$FINAL_BOSS_NAME 挡住了你的去路！")
